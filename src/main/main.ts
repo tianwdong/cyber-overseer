@@ -835,7 +835,7 @@ async function interfaceSmoke(){
  check(await pet.webContents.executeJavaScript('document.getElementById("pet-hit").dataset.petResponse==="true"'),'stroking did not produce a local response');
  check(animation.sequence===sequenceBefore,'stroking changed recovery animation dispatch');
 
- await pet.webContents.executeJavaScript(`window.dragEvents=[];for(const type of ['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture','blur'])window.addEventListener(type,e=>{if(type==='pointermove'&&!e.buttons)return;window.dragEvents.push({type,target:e.target.id,x:e.clientX,y:e.clientY,buttons:e.buttons});},true);`);
+ await pet.webContents.executeJavaScript(`window.dragEvents=[];window.addEventListener('error',e=>window.dragEvents.push({error:e.message}));for(const type of ['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture','blur'])window.addEventListener(type,e=>{if(type==='pointermove'&&!e.buttons)return;window.dragEvents.push({type,target:e.target.id,x:e.clientX,y:e.clientY,buttons:e.buttons});},true);`);
  const originalCharacter=state.character;
  // Offscreen Chromium isolates the simulated gesture from native mouse input.
  // Real desktop drag acceptance remains separate from this CI exercise.
@@ -859,7 +859,9 @@ async function interfaceSmoke(){
    pet.setIgnoreMouseEvents(false,{forward:true});
    await dragInput('mouseMoved',head,0);await new Promise(r=>setTimeout(r,350));
    check(await pet.webContents.executeJavaScript('(()=>{const card=document.getElementById("supply-card"),a=card.getBoundingClientRect(),b=document.getElementById("pet-hit").getBoundingClientRect();return card.hidden||a.right<=b.left||a.left>=b.right||a.bottom<=b.top||a.top>=b.bottom;})()'),'quota card must not cover the docked drag handle');
-   await dragInput('mousePressed',head,1);await new Promise(r=>setTimeout(r,400));
+   await dragInput('mousePressed',head,1);
+   // CI rendering can lag the 220 ms hold timer; wait for the observable state.
+   for(let attempt=0;attempt<30;attempt++){if(await pet.webContents.executeJavaScript('document.getElementById("pet-hit").dataset.dragging==="true"'))break;await new Promise(r=>setTimeout(r,100));}
    check(await pet.webContents.executeJavaScript('document.getElementById("pet-hit").dataset.dragging==="true"'),'edge hold did not pick up '+character+' '+edge+' '+await pet.webContents.executeJavaScript('JSON.stringify({events:window.dragEvents,dragging:document.getElementById("pet-hit").dataset.dragging,rect:document.getElementById("pet-hit").getBoundingClientRect(),card:document.getElementById("supply-card").getBoundingClientRect()})'));
    const destination={x:Math.round(pet.getBounds().width/2),y:450};
    await dragInput('mouseMoved',destination,1);await new Promise(r=>setTimeout(r,220));
@@ -876,6 +878,7 @@ async function interfaceSmoke(){
  pet.webContents.debugger.detach();
  pet.setIgnoreMouseEvents=restoreMouseEvents;pet.setIgnoreMouseEvents(true,{forward:true});
  state.character=originalCharacter;await clearManualPet();movePet();
+ panel.show();
  state.tasks=state.tasks.map((t,i)=>({...t,title:i===0?'跨任务恢复与长标题显示 · Cross-task recovery and long title layout':t.title}));
  supply.account={windows:[{id:'codex',name:'Codex',used:24,minutes:300,resetAt:Date.now()+3600000},{id:'codex',name:'Codex',used:89,minutes:10080,resetAt:Date.now()+86400000}],fetchedAt:Date.now(),stale:false,resets:null};
  inbox.entries=[{id:'overview-fixture',threadId:ids[0],turnId:'overview-turn',title:'界面更新',cwd:'/projects/cyber-overseer',at:Date.now(),excerpt:'界面已更新，详细结果与验证记录请查看原任务。\nThe interface update is ready to review in the original task.',read:false}];
