@@ -31,7 +31,7 @@ Resume interrupted tasks, attempt recovery from compaction failures, and collect
 
 If you have the DMG, open it, drag **Cyber Overseer.app** into **Applications**, and launch it. Keep Codex Desktop running and signed in. The app bundles its runtime dependencies; you do not need to install Node.js or Python separately.
 
-**[Download the macOS preview DMG](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.0)** · Apple Silicon · approximately 124 MiB. Not notarized. See [App and DMG packaging](docs/packaging.md) for installation and build details (Chinese).
+**[Download the macOS preview DMG](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.0)** · Apple Silicon · approximately 130 MiB. Not notarized. See [App and DMG packaging](docs/packaging.md) for installation and build details (Chinese).
 
 ### Run from source
 

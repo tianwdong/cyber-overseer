@@ -382,7 +382,7 @@ async function createOverlays() {
   overlays.forEach(w=>w.destroy());overlays.clear();petInteractive.clear();
   for(const d of screen.getAllDisplays()) {
     const w=new BrowserWindow({...d.bounds,transparent:true,frame:false,focusable:false,acceptFirstMouse:true,skipTaskbar:true,show:false,resizable:false,hasShadow:false,
-      webPreferences:{preload:join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+      webPreferences:{preload:join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,offscreen:smoke&&process.argv.includes('--interface-only'),backgroundThrottling:!(smoke&&process.argv.includes('--interface-only'))}});
     secureWindow(w);w.setAlwaysOnTop(true,'floating');w.setIgnoreMouseEvents(true,{forward:true});w.setVisibleOnAllWorkspaces(true,{visibleOnFullScreen:true});
     await w.loadFile(join(__dirname,'overlay.html'));overlays.set(d.id,w);
   }
@@ -837,10 +837,11 @@ async function interfaceSmoke(){
 
  await pet.webContents.executeJavaScript(`window.dragEvents=[];for(const type of ['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture','blur'])window.addEventListener(type,e=>{if(type==='pointermove'&&!e.buttons)return;window.dragEvents.push({type,target:e.target.id,x:e.clientX,y:e.clientY,buttons:e.buttons});},true);`);
  const originalCharacter=state.character;
- // Isolate Chromium input from the user's real mouse while checking rendered trails.
+ // Offscreen Chromium isolates the simulated gesture from native mouse input.
+ // Real desktop drag acceptance remains separate from this CI exercise.
  const restoreMouseEvents=pet.setIgnoreMouseEvents.bind(pet);
- pet.setIgnoreMouseEvents=()=>restoreMouseEvents(true,{forward:false});
- pet.setIgnoreMouseEvents(true);
+ pet.setIgnoreMouseEvents=()=>restoreMouseEvents(false);
+ pet.setIgnoreMouseEvents(false);
  pet.webContents.debugger.attach('1.3');
  const dragInput=(type:string,point:{x:number;y:number},buttons:number)=>pet.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type,...point,button:buttons||type==='mouseReleased'?'left':'none',buttons,clickCount:type==='mouseMoved'?0:1});
  for(const character of ['foreman','medic','mechanic','ranger'] as const){
@@ -852,16 +853,17 @@ async function interfaceSmoke(){
    check(await pet.webContents.executeJavaScript(`document.getElementById('pet-hit').dataset.docked===${JSON.stringify(edge)}`),'edge did not dock');
    check(await pet.webContents.executeJavaScript('document.getElementById("pet-hit").dataset.frontPeek==="true"'),'front portrait unavailable');
    check(await pet.webContents.executeJavaScript(`(()=>{const r=document.getElementById('pet-hit').getBoundingClientRect();return r.width===56&&r.left>=0&&r.right<=innerWidth;})()`),'head is not reachable');
-   await writeFile(join(dir,`edge-${character}-${edge}.png`),(await pet.webContents.capturePage({x:edge==='left'?0:pet.getBounds().width-180,y:220,width:180,height:180})).toPNG());
+   await writeFile(join(dir,`edge-${character}-${edge}.png`),Buffer.from((await pet.webContents.executeJavaScript('document.getElementById("pet").toDataURL()')).split(',')[1],'base64'));
    manualPet=null;await loadManualPet();check((manualPet as {dock?:DockEdge}|null)?.dock===edge,'docked placement did not survive reload');
    const head=await pet.webContents.executeJavaScript(`(()=>{const r=document.getElementById('pet-hit').getBoundingClientRect();return {x:Math.round(r.x+20),y:Math.round(r.y+30)};})()`);
    pet.setIgnoreMouseEvents(false,{forward:true});
-   await dragInput('mouseMoved',head,0);await new Promise(r=>setTimeout(r,100));
+   await dragInput('mouseMoved',head,0);await new Promise(r=>setTimeout(r,350));
+   check(await pet.webContents.executeJavaScript('(()=>{const card=document.getElementById("supply-card"),a=card.getBoundingClientRect(),b=document.getElementById("pet-hit").getBoundingClientRect();return card.hidden||a.right<=b.left||a.left>=b.right||a.bottom<=b.top||a.top>=b.bottom;})()'),'quota card must not cover the docked drag handle');
    await dragInput('mousePressed',head,1);await new Promise(r=>setTimeout(r,400));
-   check(await pet.webContents.executeJavaScript('document.getElementById("pet-hit").dataset.dragging==="true"'),'edge hold did not pick up '+character+' '+edge);
+   check(await pet.webContents.executeJavaScript('document.getElementById("pet-hit").dataset.dragging==="true"'),'edge hold did not pick up '+character+' '+edge+' '+await pet.webContents.executeJavaScript('JSON.stringify({events:window.dragEvents,dragging:document.getElementById("pet-hit").dataset.dragging,rect:document.getElementById("pet-hit").getBoundingClientRect(),card:document.getElementById("supply-card").getBoundingClientRect()})'));
    const destination={x:Math.round(pet.getBounds().width/2),y:450};
    await dragInput('mouseMoved',destination,1);await new Promise(r=>setTimeout(r,220));
-   await writeFile(join(dir,`drag-out-${character}-${edge}.png`),(await pet.webContents.capturePage()).toPNG());
+   await writeFile(join(dir,`drag-out-${character}-${edge}.png`),Buffer.from((await pet.webContents.executeJavaScript('document.getElementById("pet").toDataURL()')).split(',')[1],'base64'));
    destination.x+=90;destination.y=260;
    await dragInput('mouseMoved',destination,1);await new Promise(r=>setTimeout(r,350));
    await dragInput('mouseReleased',destination,0);await new Promise(r=>setTimeout(r,450));

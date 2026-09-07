@@ -31,7 +31,7 @@
 
 已有 DMG 时，双击打开，将 **Cyber Overseer.app** 拖入 **Applications**，再启动应用。保持 Codex Desktop 已运行并登录即可；App 内置运行依赖，无需另装 Node.js 或 Python。
 
-**[下载 macOS 预览版 DMG](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.0)** · Apple Silicon · 约 124 MiB。尚未公证；安装与自行构建见 [App 与 DMG 打包](docs/packaging.md)。
+**[下载 macOS 预览版 DMG](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.0)** · Apple Silicon · 约 130 MiB。尚未公证；安装与自行构建见 [App 与 DMG 打包](docs/packaging.md)。
 
 ### 从源码运行
 

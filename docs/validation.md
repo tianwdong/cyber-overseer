@@ -28,3 +28,7 @@ The 12-second GIFs reuse the app’s character renderer with a simulated task ca
 ```sh
 node scripts/build-readme-visuals.mjs
 ```
+
+CI 界面演练使用离屏 Chromium，隔离真实鼠标与模拟事件，检查渲染和模拟交互。它不覆盖原生窗口鼠标捕获、跨应用焦点或实际桌面拖动验收。Windows 单元测试不把 POSIX 权限位当作 ACL 证明。
+
+CI UI exercises use offscreen Chromium to isolate native pointer input. They validate rendering and simulated interaction, not native capture, cross-app focus, or real desktop dragging. POSIX mode assertions are not Windows ACL validation.

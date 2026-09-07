@@ -9,7 +9,8 @@ import {tr} from '../src/core/i18n';
 test('settings default to three attempts and Codex language, persist privately, reject invalid values',async()=>{
   const dir=await mkdtemp(join(tmpdir(),'overseer-settings-')),file=join(dir,'settings.json');
   try{assert.deepEqual(await loadSettings(file),defaultSettings);
-    const settings={retryAfterFailure:false,maxAttempts:5,language:'en' as const};await saveSettings(settings,file);assert.deepEqual(await loadSettings(file),settings);assert.equal((await stat(file)).mode&0o777,0o600);
+    const settings={retryAfterFailure:false,maxAttempts:5,language:'en' as const};await saveSettings(settings,file);assert.deepEqual(await loadSettings(file),settings);if(process.platform!=='win32')assert.equal((await stat(file)).mode&0o777,0o600); // POSIX mode bits do not validate Windows ACLs.
+
     for(const maxAttempts of [0,11,1.2,NaN])assert.throws(()=>parseSettings({...settings,maxAttempts}));assert.throws(()=>parseSettings({...settings,language:'unknown'}));
     await writeFile(file,'{"maxAttempts":100}');assert.deepEqual(await loadSettings(file),defaultSettings);
   }finally{await rm(dir,{recursive:true,force:true});}

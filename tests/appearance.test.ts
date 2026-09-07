@@ -6,7 +6,8 @@ import {join} from 'node:path';
 import {saveCharacter,loadCharacter} from '../src/main/appearance';
 test('character selection survives saving and reload with private local permissions',async()=>{
   const root=await mkdtemp(join(tmpdir(),'overseer-appearance-')),file=join(root,'settings','appearance.json');
-  try{assert.equal(await loadCharacter(file),'foreman');await saveCharacter(file,'mechanic');assert.equal(await loadCharacter(file),'mechanic');assert.equal((await stat(file)).mode&0o777,0o600);await saveCharacter(file,'ranger');assert.equal(await loadCharacter(file),'ranger');}finally{await rm(root,{recursive:true,force:true});}
+  try{assert.equal(await loadCharacter(file),'foreman');await saveCharacter(file,'mechanic');assert.equal(await loadCharacter(file),'mechanic');if(process.platform!=='win32')assert.equal((await stat(file)).mode&0o777,0o600); // POSIX mode bits do not validate Windows ACLs.
+await saveCharacter(file,'ranger');assert.equal(await loadCharacter(file),'ranger');}finally{await rm(root,{recursive:true,force:true});}
 });
 test('unknown and damaged appearance settings fall back to a drawable character',async()=>{
   const root=await mkdtemp(join(tmpdir(),'overseer-appearance-')),file=join(root,'appearance.json');

@@ -27,7 +27,7 @@ const supplyTransition=new SupplyTransition();let supplySway=0;let bowl:{x:numbe
 let supply:SupplyState={account:null,task:null,title:null},pinned=false,hoverTimer:ReturnType<typeof setTimeout>|undefined;
 let cardSignature='';
 function paintCard(){const signature=JSON.stringify([supply,character,language,Math.floor(Date.now()/60000)]);if(signature!==cardSignature){const scroll=card.scrollTop;renderSupplyCard(content,supply,character,language);card.scrollTop=scroll;cardSignature=signature;}pin.textContent=pinned?(language==='en'?'Unpin':'取消固定'):(language==='en'?'Pin card':'固定卡片');document.getElementById('supply-settings')!.textContent=language==='en'?(supply.watch?.attention?'Review tasks':'Tasks'):(supply.watch?.attention?'查看待处理任务':'查看任务');}
-function positionCard(){const left=Math.max(12,Math.min(innerWidth-354,x-310)),top=Math.max(12,Math.min(innerHeight-card.offsetHeight-12,y-card.offsetHeight-115));card.style.left=`${left}px`;card.style.top=`${top}px`;}
+function positionCard(){const preferred=dock==='left'?72:dock==='right'?innerWidth-410:x-310;const left=Math.max(12,Math.min(innerWidth-354,preferred)),top=Math.max(12,Math.min(innerHeight-card.offsetHeight-12,y-card.offsetHeight-115));card.style.left=`${left}px`;card.style.top=`${top}px`;}
 function showCard(){paintCard();card.hidden=false;positionCard();}
 pin.addEventListener('click',()=>{pinned=!pinned;paintCard();});
 document.getElementById('supply-settings')!.addEventListener('click',()=>void window.overseer.petAction('settings'));
