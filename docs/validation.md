@@ -32,3 +32,13 @@ node scripts/build-readme-visuals.mjs
 CI 界面演练使用离屏 Chromium，隔离真实鼠标与模拟事件，检查渲染和模拟交互。它不覆盖原生窗口鼠标捕获、跨应用焦点或实际桌面拖动验收。Windows 单元测试不把 POSIX 权限位当作 ACL 证明。
 
 CI UI exercises use offscreen Chromium to isolate native pointer input. They validate rendering and simulated interaction, not native capture, cross-app focus, or real desktop dragging. POSIX mode assertions are not Windows ACL validation.
+
+## 首版发布检查 / Initial release checks
+
+[macOS 与 Windows CI](https://github.com/tianwdong/cyber-overseer/actions/runs/34113291268) 在代码版本 `90ea0a5` 上通过：类型检查、119 项测试、构建与界面演练。Windows 真机 Codex 恢复仍未验收。
+
+Both CI platforms passed type checking, 119 tests, builds and UI exercises at `90ea0a5`. Real Windows Codex recovery remains unverified.
+
+额度卡遮挡贴边拖动区域已修复，四角色双侧拖出与残影检查通过。本机原生窗口完整演练此前通过，但最新复跑停在移动轨迹检查；原生动作演练稳定性仍待改进。
+
+The quota card no longer covers edge drag handles; all four characters passed both-edge dragging and stale-pixel checks. The full native exercise passed earlier, but the latest rerun failed the travel-trajectory check. Native animation exercise stability remains pending.
