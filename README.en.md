@@ -15,7 +15,7 @@ Resume interrupted tasks, attempt recovery from compaction failures, and collect
 
 [Get started](#get-started) · [Meet the crew](#meet-the-crew) · [Features](#features) · [FAQ](#faq)
 
-<sub>Experimental Alpha · Local preview for macOS Apple Silicon · Windows validation pending</sub>
+<sub>Experimental Alpha · macOS Apple Silicon / Windows x64</sub>
 
 </div>
 
@@ -32,6 +32,12 @@ Resume interrupted tasks, attempt recovery from compaction failures, and collect
 If you have the DMG, open it, drag **Cyber Overseer.app** into **Applications**, and launch it. Keep Codex Desktop running and signed in. The app bundles its runtime dependencies; you do not need to install Node.js or Python separately.
 
 **[Download the macOS preview DMG](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.0)** · Apple Silicon · approximately 130 MiB. Not notarized. See [App and DMG packaging](docs/packaging.md) for installation and build details (Chinese).
+
+### Windows app
+
+**[Download the Windows x64 preview installer](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.1)**. Run the `.exe` and choose an installation directory. Python and SQLite are bundled; no separate Node.js or Python installation is needed. The installer supports English and Chinese, with removal through Windows Settings.
+
+The installer is unsigned and Windows may show a reputation warning. Real Codex recovery and multi-monitor desktop behavior still need Windows validation. See [Windows support status](docs/windows-support.md) (Chinese).
 
 ### Run from source
 
@@ -99,7 +105,7 @@ The results inbox keeps final reply excerpts. Expand an entry to mark it read, o
 
 ## FAQ
 
-**Which platforms are supported?** The current integration is local Codex Desktop. An Apple Silicon app and DMG are available as local previews; Windows adaptations await real-machine validation. Claude, Grok, remote tasks, and Intel app packages are not available yet.
+**Which platforms are supported?** The current integration is local Codex Desktop. Preview downloads include an Apple Silicon app/DMG and a Windows x64 installer. Real Windows Codex recovery remains unverified. Claude, Grok, remote tasks, and Intel app packages are not available yet.
 
 **Does it change my Codex settings?** Recovery targets the full task ID, reads task databases and logs without modifying them, and preserves the original model and approval settings. The internal protocol adapter is experimental and needs compatibility checks after Codex updates.
 

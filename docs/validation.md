@@ -42,3 +42,13 @@ Both CI platforms passed type checking, 119 tests, builds and UI exercises at `9
 额度卡遮挡贴边拖动区域已修复，四角色双侧拖出与残影检查通过。本机原生窗口完整演练此前通过，但最新复跑停在移动轨迹检查；原生动作演练稳定性仍待改进。
 
 The quota card no longer covers edge drag handles; all four characters passed both-edge dragging and stale-pixel checks. The full native exercise passed earlier, but the latest rerun failed the travel-trajectory check. Native animation exercise stability remains pending.
+
+## Windows 安装包 / Windows installer — v0.1.1
+
+[Windows 安装流水线](https://github.com/tianwdong/cyber-overseer/actions/runs/34115707925) 已通过：119 项测试、NSIS x64 构建、中文及空格目录安装、移除开发 Python 后启动安装版、内置 Python 路径检查、双语界面及角色拖动演练、卸载和 SHA-256 生成。
+
+The Windows pipeline passed 119 tests, NSIS x64 packaging, installation to a Unicode path with spaces, installed-app startup without developer Python on PATH, bundled-runtime verification, bilingual UI and simulated character dragging, uninstallation, and SHA-256 generation.
+
+安装程序未代码签名。CI 使用 Windows 托管构建机和模拟任务，不覆盖用户 Windows 11 干净机器、真实 Codex IPC、真实故障恢复、Defender 或多屏缩放验收。
+
+The installer is unsigned. Hosted Windows CI uses simulated tasks; it does not validate a clean user Windows 11 system, real Codex IPC/recovery, Defender, or multi-monitor scaling.

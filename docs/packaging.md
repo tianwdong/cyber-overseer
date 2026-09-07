@@ -1,6 +1,6 @@
 # macOS App 与本地 DMG
 
-当前打包目标为 Apple Silicon（arm64），产出本地 Alpha 预览。预览包见 [GitHub Releases](https://github.com/tianwdong/cyber-overseer/releases)。未完成 Developer ID 签名、公证或干净机器验收；Windows 与 Intel 安装包尚未提供。
+当前打包目标为 Apple Silicon（arm64），产出本地 Alpha 预览。预览包见 [GitHub Releases](https://github.com/tianwdong/cyber-overseer/releases)。未完成 Developer ID 签名、公证或干净机器验收；Windows x64 安装包见 [Windows 打包说明](windows-support.md)；Intel Mac 安装包尚未提供。
 
 ## 构建
 
@@ -15,7 +15,7 @@ npm run package:mac
 产物：
 
 - `release/mac-arm64/Cyber Overseer.app`
-- `release/Cyber-Overseer-0.1.0-mac-arm64.dmg`
+- `release/Cyber-Overseer-<version>-mac-arm64.dmg`
 - 同名 `.dmg.sha256`
 
 DMG 内有 App 和 Applications 快捷入口。安装后无需用户安装 Node.js 或 Python；仍需已登录的 Codex Desktop。构建脚本只替换项目里的生成目录，不覆盖 `/Applications` 中的应用。

@@ -15,7 +15,7 @@
 
 [开始使用](#开始使用) · [认识督工](#谁来值班) · [能做什么](#能做什么) · [常见问题](#常见问题)
 
-<sub>实验性 Alpha · macOS Apple Silicon 本地预览 · Windows 待验收</sub>
+<sub>实验性 Alpha · macOS Apple Silicon / Windows x64</sub>
 
 </div>
 
@@ -32,6 +32,12 @@
 已有 DMG 时，双击打开，将 **Cyber Overseer.app** 拖入 **Applications**，再启动应用。保持 Codex Desktop 已运行并登录即可；App 内置运行依赖，无需另装 Node.js 或 Python。
 
 **[下载 macOS 预览版 DMG](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.0)** · Apple Silicon · 约 130 MiB。尚未公证；安装与自行构建见 [App 与 DMG 打包](docs/packaging.md)。
+
+### Windows App
+
+**[下载 Windows x64 预览版安装程序](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.1)**。运行 `.exe`，选择安装目录即可；内置 Python／SQLite，无需另装 Node.js 或 Python。支持中英文安装界面，可从 Windows 设置卸载。
+
+安装包尚未代码签名，Windows 可能显示信誉提示。真实 Codex 故障恢复与多屏桌面行为仍待 Windows 真机验收，详见 [Windows 支持状态](docs/windows-support.md)。
 
 ### 从源码运行
 
@@ -99,7 +105,7 @@ npm start
 
 ## 常见问题
 
-**支持哪些平台？** 当前接入本机 Codex Desktop。Apple Silicon 有本地 App／DMG 预览；Windows 已做源码适配，待真机验收。Claude、Grok、远程任务和 Intel 安装包尚未提供。
+**支持哪些平台？** 当前接入本机 Codex Desktop。Apple Silicon 提供 App／DMG，Windows x64 提供安装程序；Windows 真实故障恢复仍待验收。Claude、Grok、远程任务和 Intel 安装包尚未提供。
 
 **会改动我的 Codex 设置吗？** 按完整任务 ID 定向恢复，只读任务数据库与日志，保留原模型和审批设置。内部协议属于实验性适配，Codex 升级后需要复核兼容性。
 

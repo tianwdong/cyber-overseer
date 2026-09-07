@@ -1,19 +1,34 @@
 # Windows 支持状态
 
-Windows 是目标平台；截至 2026-09-07，完成首批源码适配，尚未完成 Windows 真机验收。不能据此宣称 Windows 正式可用或提供开箱即用安装包。
+Windows x64 提供实验性安装包；真实 Codex 恢复仍待 Windows 真机验收，不代表正式支持。
 
 ## 已接入
 
 - 配置、值班记录、任务锁、重试状态和宠物位置使用 `%APPDATA%\Cyber Overseer`。macOS 继续使用原目录，不迁移已有设置。
 - 任务索引、语言和用量读取统一遵循 `CODEX_HOME`；未指定时读取用户目录下的 `.codex`。数据库保持只读。
 - Windows 使用本机命名管道 `\\.\pipe\codex-ipc`；macOS 保留 Unix socket 及文件属主检查。恢复仍根据完整任务 ID 寻找持有者，不依赖窗口焦点。
-- Python 自动尝试 `py -3`、`python`、`python3`，验证 Python 3.9+ 和 sqlite3；子进程不弹控制台。
+- 安装包优先使用内置 Python 3.13.15／SQLite；源码运行可自动尝试 `py -3`、`python`、`python3`。显式 `CYBER_OVERSEER_PYTHON` 保留最高优先级；子进程不弹控制台。
 - Codex 用量服务支持 PATH 中的 `codex.exe`，或明确指定可执行文件路径。没有用量服务时显示不可用，不伪造余额。
 - Windows 使用标准窗口标题栏和固定通知应用标识。
 - 窗口观察器只在 macOS 编译，其他平台明确返回不可定位；自动恢复不因此被禁用。
 - CI 配置包含 macOS 和 Windows：类型检查、测试、构建、双语界面冒烟截图。管道协议测试在 Windows 上创建独立随机命名管道，不连接真实任务。
 
 Windows 管道地址参考 [OpenAI Codex 官方源码](https://github.com/openai/codex/blob/main/codex-rs/tui/src/ide_context/ipc.rs)。该源码只能证明共享传输入口；不能证明 Windows Desktop 当前版本支持全部私有恢复方法。Windows 管道服务端身份/ACL 尚未实机核验，不能宣称已有 POSIX 属主检查的同等保障。
+
+## 安装与打包
+
+[下载 Windows x64 预览版](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.1)，运行 `Cyber-Overseer-0.1.1-windows-x64-setup.exe`。默认按当前用户安装，提供中英文引导、应用图标、开始菜单／桌面快捷方式和卸载入口；卸载保留个人配置。安装包未签名，可能触发 SmartScreen 信誉提示。
+
+在 Windows x64 开发机上构建：
+
+```powershell
+npm ci
+npm run package:win
+```
+
+输出位于 `release/windows`。Python 固定下载版本并校验 SHA-256；项目、角色和第三方授权文件随包携带。打包配置见 `electron-builder.win.json`。
+
+`Windows installer` Actions 可手动触发：构建后在含中文及空格的目录安装，移除 PATH 中开发 Python，再运行安装后程序的界面演练，最后验证卸载并生成 SHA-256 文件。此过程使用模拟任务，不连接真实 Codex。
 
 ## 当前源码运行方式
 
@@ -49,3 +64,5 @@ npm start
 - 检查真实管道身份和恢复方法兼容性；打包产物通过 Windows Defender 检查及启动验收。
 
 本机证据：macOS 类型检查、119 项测试与构建通过。Windows CI 状态以仓库 Actions 为准；CI 不代表真实 Windows 恢复验收，真机证据仍为空缺。
+
+安装与卸载 CI 已通过，记录见 [验证记录](validation.md#windows-安装包--windows-installer--v011)。这不改变上述真实 Codex 恢复的验收边界。
