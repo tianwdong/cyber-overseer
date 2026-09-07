@@ -1,5 +1,5 @@
 {
-  "appId": "local.cyber-overseer.desktop",
+  "appId": "CyberOverseer.Desktop",
   "productName": "Cyber Overseer",
   "directories": { "output": "release/windows" },
   "asar": false,

@@ -2,7 +2,10 @@ import {mkdir,readFile,writeFile,access,cp,rm} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {join,resolve} from 'node:path';
+import {createRequire} from 'node:module';
 if(process.platform!=='win32'||process.arch!=='x64')throw Error('Run Windows x64 packaging on Windows x64.');
+// Electron 44 downloads lazily; materialize its binary and license files first.
+createRequire(import.meta.url)('electron');
 const root=resolve('artifacts/windows-runtime');
 const url='https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.13.15%2B20260901-x86_64-pc-windows-msvc-install_only.tar.gz';
 const sha256='9bcc038a0bf180612ed56dec93d4977d035e80b8d9320ef51a38c287baf134b7';
