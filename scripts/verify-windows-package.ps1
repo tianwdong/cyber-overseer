@@ -6,8 +6,9 @@ $install = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$install
 if ($install.ExitCode -ne 0) { throw "Install failed: $($install.ExitCode)" }
 $executable = Join-Path $installDir 'Cyber Overseer.exe'
 if (!(Test-Path $executable)) { throw 'Installed application missing' }
-$out = Join-Path $env:RUNNER_TEMP 'overseer-package-stdout.log'
-$err = Join-Path $env:RUNNER_TEMP 'overseer-package-stderr.log'
+$evidence = New-Item -ItemType Directory -Force 'artifacts/windows-package-evidence'
+$out = Join-Path $evidence.FullName 'overseer-package-stdout.log'
+$err = Join-Path $evidence.FullName 'overseer-package-stderr.log'
 # No developer Python on PATH. The packaged smoke also checks sys.executable.
 $savedPath = $env:PATH
 try {
@@ -19,6 +20,9 @@ try {
   Get-Content $err
   if ($process.ExitCode -ne 0) { throw "Packaged smoke failed: $($process.ExitCode)" }
   if (!(Select-String -Path $out -Pattern 'packaged-runtime' -Quiet)) { throw 'Bundled runtime proof missing' }
+  $screenshots = Join-Path ([System.IO.Path]::GetTempPath()) 'cyber-overseer-smoke'
+  if (!(Test-Path (Join-Path $screenshots 'interface-en-840.png'))) { throw 'Installed UI screenshot missing' }
+  Copy-Item (Join-Path $screenshots '*.png') $evidence.FullName
 } finally { $env:PATH = $savedPath }
 $uninstaller = Join-Path $installDir 'Uninstall Cyber Overseer.exe'
 if (!(Test-Path $uninstaller)) { throw 'Uninstaller missing' }

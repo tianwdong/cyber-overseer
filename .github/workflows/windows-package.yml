@@ -31,6 +31,4 @@ jobs:
         if: always()
         with:
           name: windows-package-evidence
-          path: |
-            ${{ runner.temp }}/overseer-package-*.log
-            ${{ runner.temp }}/cyber-overseer-smoke/*.png
+          path: artifacts/windows-package-evidence/*
