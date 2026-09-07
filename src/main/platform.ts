@@ -18,11 +18,13 @@ type Python = { binary: string; args: string[] };
 let python: Promise<Python> | undefined;
 async function findPython(): Promise<Python> {
   const resources = (process as NodeJS.Process & {resourcesPath?:string}).resourcesPath;
-  const bundled = resources && process.platform === 'darwin' ? [{binary:posix.join(resources,'python','bin','python3'),args:[]}] : [];
+  const bundled: Python[] = !resources ? [] : process.platform === 'win32'
+    ? [{binary:win32.join(resources,'python','python.exe'),args:[]}]
+    : process.platform === 'darwin' ? [{binary:posix.join(resources,'python','bin','python3'),args:[]}] : [];
   const candidates: Python[] = process.env.CYBER_OVERSEER_PYTHON
     ? [{ binary: process.env.CYBER_OVERSEER_PYTHON, args: [] }]
     : process.platform === 'win32'
-      ? [{ binary: 'py', args: ['-3'] }, { binary: 'python', args: [] }, { binary: 'python3', args: [] }]
+      ? [...bundled, { binary: 'py', args: ['-3'] }, { binary: 'python', args: [] }, { binary: 'python3', args: [] }]
       : [...bundled, { binary: '/usr/bin/python3', args: [] }, { binary: 'python3', args: [] }];
   for (const candidate of candidates) {
     try {

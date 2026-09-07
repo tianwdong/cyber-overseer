@@ -1,0 +1,25 @@
+{
+  "appId": "local.cyber-overseer.desktop",
+  "productName": "Cyber Overseer",
+  "directories": { "output": "release/windows" },
+  "asar": false,
+  "npmRebuild": false,
+  "files": ["dist/**/*", "!dist/watch.cjs", "!dist/window-observer", "data/**/*", "scripts/usage-scan.py", "package.json"],
+  "extraResources": [
+    { "from": "artifacts/windows-runtime/python", "to": "python" },
+    { "from": "artifacts/windows-runtime/licenses", "to": "licenses" }
+  ],
+  "win": { "target": "nsis", "icon": "assets/icon/icon.ico", "artifactName": "Cyber-Overseer-${version}-windows-x64-setup.${ext}" },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowElevation": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "runAfterFinish": false,
+    "deleteAppDataOnUninstall": false,
+    "installerLanguages": ["en_US", "zh_CN"],
+    "displayLanguageSelector": true
+  }
+}

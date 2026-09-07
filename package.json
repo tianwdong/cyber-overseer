@@ -1,6 +1,6 @@
 {
   "name": "cyber-overseer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Automatically recover failed Codex tasks with a desktop overseer.",
   "main": "dist/main.cjs",
@@ -16,7 +16,8 @@
     "verify": "npm run typecheck && npm test && npm run smoke",
     "smoke:interface": "npm run build && electron . --smoke --interface-only",
     "build:icon": "node scripts/build-icon.mjs",
-    "package:mac": "npm run build && npm run build:native && node scripts/prepare-python.mjs && node scripts/package-mac.mjs"
+    "package:mac": "npm run build && npm run build:native && node scripts/prepare-python.mjs && node scripts/package-mac.mjs",
+    "package:win": "npm run build && node scripts/prepare-windows.mjs && electron-builder --win nsis --x64 --config electron-builder.win.json --publish never"
   },
   "keywords": [],
   "author": "tianwdong",
@@ -24,6 +25,7 @@
   "devDependencies": {
     "@types/node": "26.4.1",
     "electron": "44.2.0",
+    "electron-builder": "26.15.3",
     "esbuild": "0.28.2",
     "tsx": "4.23.13",
     "typescript": "7.0.2"
