@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'"><title>Cyber Overseer · 赛博督工</title><link rel="stylesheet" href="style.css"></head>
+<body>
+  <header class="topbar"><div class="brand"><span class="brand-mark">⌁</span> CYBER OVERSEER <span class="version">/ 001</span></div><span class="mode" id="mode">演练场</span></header>
+  <main>
+    <section class="intro"><div><p class="eyebrow">THE AGENT'S SUPERVISOR</p><h1 id="page-title">别停，<span>接着干。</span></h1><p class="lede" id="page-description">断流就续跑，压缩异常就恢复。督工自动接手。</p></div><div class="shift"><span class="dot"></span><div><span id="watch-heading">督工已到岗</span><small id="shift-state">等待目标</small><button id="open-inbox" class="secondary">收工信箱</button><button id="open-settings" class="secondary">设置</button><button id="open-characters" class="secondary wardrobe-entry">角色工坊 ↗</button></div></div></section>
+    <div id="watch-health-alert" role="status" hidden></div>
+    <nav id="page-nav" aria-label="页面"><button id="nav-overview" aria-pressed="true">总览</button><button id="nav-tasks" aria-pressed="false">任务</button></nav><section id="overview"></section>
+    <div class="workspace">
+      <aside><div class="section-line"><span id="roster-heading">巡逻名单</span><span id="count">03</span></div><p class="hint" id="list-hint">同名也没关系，任务 ID 说了算。</p><div id="task-tools"><div class="task-search-field"><input id="task-search" type="search" autocomplete="off" spellcheck="false" placeholder="搜索任务或项目" aria-label="搜索任务、项目或任务 ID"><button id="clear-search" hidden aria-label="清除搜索">×</button></div><div id="task-filters" role="group" aria-label="筛选任务"><button data-filter="all" aria-pressed="true">全部</button><button data-filter="attention" aria-pressed="false">待处理</button><button data-filter="watching" aria-pressed="false">看护中</button></div><button id="reveal-selected" hidden></button></div><div id="tasks"></div><p id="task-empty" hidden></p><button class="secondary" id="global-auto">全局自动督工</button><button class="quiet" id="read-tasks">读取本机任务</button><p class="inventory-error" id="inventory-error"></p><div class="aside-note"><span>↳</span><p>隐藏的任务也能自动恢复。<br>窗口出现并确认位置后，督工走到边上。</p></div></aside>
+      <section class="target-area"><div class="section-line"><span id="detail-heading">目标观察台</span><span class="pill" id="location-pill">等待定位</span></div>
+        <div class="target-id"><span>THREAD</span><code id="selected-id">尚未选择</code></div>
+        <div class="stage"><div class="stage-grid"></div><div class="mock-window"><div class="mock-title"><div class="traffic"><i></i><i></i><i></i></div><span id="stage-label">模拟 Codex 窗口</span><span class="mock-app">CODEX</span></div><div class="mock-content"><p class="terminal-label">TASK / <span id="task-short">—</span></p><h2 id="target-title">选择一个任务</h2><p id="target-project"></p><div class="terminal-line"><span class="terminal-prompt">›</span><span id="task-status">等待任务状态</span></div><div class="error-box" id="error-box"><span>!</span><p id="error-text"></p></div><div class="terminal-cursor"></div></div></div><div class="stage-caption" id="stage-caption">演练窗口 · 不控制真实 Codex</div></div>
+        <div class="steps"><div id="step-1"><b>01</b><span>确认任务 ID</span></div><div id="step-2"><b>02</b><span>绑定可见窗口</span></div><div id="step-3"><b>03</b><span>走到窗口边缘</span></div></div>
+        <div id="recovery-handoff" role="status" hidden><p id="handoff-message"></p><button id="check-recovery" class="secondary">重新检查</button><span id="check-feedback" role="status"></span></div><p id="target-watch-status"></p><div class="actions"><button class="primary" id="whip">抽一鞭 <span>↗</span></button><button class="secondary" id="show-demo">显示所选任务</button><button class="quiet" id="hide-demo">切走目标</button><button class="primary" id="auto">启停此任务自动督工</button><button class="secondary" id="observe">启停窗口定位</button></div>
+        <details id="duty-panel"><summary>值班记录</summary><div id="duty-health"></div><ol id="duty-list"></ol><button id="clear-duty" class="quiet">清除此任务记录</button></details>
+      </section>
+    </div>
+    <div class="statusbar"><span class="status-icon">↳</span><p id="message" role="status"></p></div>
+  </main>
+  <footer><span>LOCAL FIRST · CODEX DESKTOP</span><span id="boundary">自动恢复独立运行 · 动画不影响续跑</span></footer>
+  <dialog id="inbox-dialog" aria-labelledby="inbox-title"><div class="workshop-top"><h2 id="inbox-title">收工信箱</h2><button id="close-inbox" class="quiet">关闭 ×</button></div><p id="inbox-hint" class="hint"></p><p id="inbox-error" role="status" hidden></p><div class="inbox-actions"><span id="inbox-count" role="status"></span><button id="inbox-read-all" class="secondary">全部标为已读</button></div><div id="inbox-list"></div></dialog>
+  <dialog id="character-workshop" aria-labelledby="workshop-title">
+    <div class="workshop-top"><div><p class="eyebrow">THE NIGHT SHIFT / CREW SELECT</p><h2 id="workshop-title">今晚，谁来盯场？</h2></div><button class="quiet" id="close-characters" aria-label="关闭角色工坊">关闭 ×</button></div>
+    <div id="character-roster" class="character-roster"></div>
+    <div class="workshop-actions"><span>看看本事</span><button class="secondary" id="preview-whip">催工动作</button><button class="secondary" id="preview-compact">压缩动作</button><button class="secondary" id="preview-recovered">复工庆祝</button></div>
+    <p id="workshop-status" role="status"></p>
+    <details id="motion-tools"><summary>动作调试</summary>
+    <section id="motion-studio" class="motion-studio">
+      <div class="motion-heading"><div><span class="eyebrow">CREW / REFINED EDITION</span><h3>角色动作台</h3></div><button id="motion-play" class="secondary">连续演练</button></div>
+      <div class="motion-layout"><div class="motion-screen"><canvas id="motion-canvas" width="1040" height="600" aria-label="角色动作预览"></canvas><div class="motion-transport"><strong id="motion-caption"></strong><input id="motion-seek" type="range" min="0" max="1000" value="0" aria-label="拖动查看动作"></div></div><div id="motion-picker" class="motion-picker"></div></div>
+      <p class="hint">动作演练不发送指令 · 拖动进度条可查看蓄力、接触与收势</p>
+    </section>
+    <div class="character-detail"><div class="detail-heading"><span>值班档案</span><strong id="character-current"></strong></div><div class="behavior-grid">
+      <div><span>待命</span><p id="behavior-idle"></p></div><div><span>赶路</span><p id="behavior-move"></p></div><div><span>催工</span><p id="behavior-recover"></p></div><div><span>压缩</span><p id="behavior-compact"></p></div>
+    </div></div>
+    </details>
+  </dialog>
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <div class="workshop-top"><h2 id="settings-title">恢复与语言</h2><button id="close-settings" class="quiet" aria-label="关闭设置">关闭 ×</button></div>
+    <form id="settings-form">
+      <label class="setting-toggle"><input id="notify-attention" type="checkbox"><span>需要接管时发送系统通知</span></label>
+      <label class="setting-toggle"><input id="retry-enabled" type="checkbox"><span>续跑后再次失败时继续重试</span></label>
+      <label class="setting-field"><span>自动恢复上限（含首次）</span><input id="retry-limit" type="number" min="1" max="10" step="1" required></label>
+      <p class="hint">每轮连续故障最多恢复指定次数。关闭重复重试后只尝试一次。</p>
+      <p class="hint">正常完成或手动开始新一轮后重新计数，重启应用不会清零。</p>
+      <p id="retry-progress" role="status"></p>
+      <label class="setting-field"><span>界面语言</span><select id="language-choice"><option value="codex">跟随 Codex</option><option value="zh">中文</option><option value="en">English</option></select></label>
+      <button id="edit-pricing" class="secondary" type="button">管理模型价格表</button><button class="primary" type="submit">保存设置</button><p id="settings-status" role="status"></p>
+    </form>
+  </dialog>
+  <script src="dashboard.js"></script>
+</body></html>

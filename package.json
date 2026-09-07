@@ -1,0 +1,40 @@
+{
+  "name": "cyber-overseer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Automatically recover failed Codex tasks with a desktop overseer.",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:native": "node scripts/build-native.mjs",
+    "dev": "npm run build && electron . --demo",
+    "start": "npm run build && electron .",
+    "watch": "npm run build && node dist/watch.cjs",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "smoke": "npm run build && electron . --smoke",
+    "verify": "npm run typecheck && npm test && npm run smoke",
+    "smoke:interface": "npm run build && electron . --smoke --interface-only",
+    "build:icon": "node scripts/build-icon.mjs",
+    "package:mac": "npm run build && npm run build:native && node scripts/prepare-python.mjs && node scripts/package-mac.mjs"
+  },
+  "keywords": [],
+  "author": "tianwdong",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/node": "26.4.1",
+    "electron": "44.2.0",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.13",
+    "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "smol-toml": "^1.8.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tianwdong/cyber-overseer.git"
+  },
+  "homepage": "https://github.com/tianwdong/cyber-overseer#readme"
+}

@@ -1,0 +1,23 @@
+# Supply telemetry
+
+Implemented read-only `account/rateLimits/read` through the Codex binary bundled in ChatGPT.app (fallback: Codex.app). Installed bundle source and a real RPC response were inspected on 2026-09-07. This creates a short-lived app-server connection, sends initialize and the single account read, then closes. No thread start, credential extraction, custom token refresh, reset consumption, or terminal input is involved. Authentication remains owned by Codex. Internal protocol compatibility remains experimental.
+
+The service refreshes every five minutes, coalesces requests, times out after fifteen seconds, and retains failed snapshots as stale. Quota data is account-wide, separate model buckets stay separate, and window labels follow actual duration. Missing data is not zero. Reset credits are display-only. Hover reads existing state and never triggers network requests.
+
+Task usage is read from the exact task ID's SQLite-indexed rollout, after verifying the real path and session metadata. Only model and token metadata are returned. Cumulative snapshots are differenced per recorded model, repeated snapshots skipped, and cached input deducted from ordinary input. In the installed Codex schema, output_tokens already includes reasoning_output_tokens; adding reasoning again would double-count it. Cumulative task tokens include that task's recorded history and are not aggregated across forks or tasks.
+
+API-equivalent cost estimates use an independently maintained, explicitly labelled price table seeded from CodeBurn LiteLLM data and supplemented by verified official prices. Exact model matches only, with separate cached pricing; unknown or mixed unpriced usage stays unavailable. This is not a subscription invoice. The original CodeBurn snapshot lacked gpt-6-astra; current official Astra and 5.6 family prices have now been added in data/pricing.json, with source URLs and long-context rules. Runtime pricing is decoupled from the build; see docs/pricing.md. Data attribution is in assets/CODEBURN-NOTICE.txt.
+
+Overlay has a 300 ms hover delay, pinnable bilingual card, task identity guard, shared quota, reset date/countdown, reset-credit count, snapshot freshness, and role-specific equipment (cat food bowl, battery, fluid reservoir, flight ring). No low-resource state stops productive work. Low reserve indication is below 20 percent, and critical below 5 percent. Continuous equipment follows body transforms, the cat bowl stays at the previous dock during travel, and an always-visible label identifies the limiting quota window. Updated quota values interpolate for one second; time alone never consumes supply. Fresh threshold crossings produce one brief inspection cue; a confirmed increase produces a short refill cue. Unknown/stale data retains the last quantity and adds a disconnected marker. Switching accounts does not trigger refill/depletion cues.
+
+Not implemented in this iteration: consuming reset credits; automatic continuation after quota exhaustion/reset; configurable quota-alert thresholds; elaborate role-specific feeding/recharge clips beyond the brief equipment cue. Existing network/compaction recovery and retry limits remain active.
+
+Validation: actual native quota read and current task usage read; unit coverage for dynamic windows, missing data, separate model buckets, staleness and pricing; Electron smoke coverage for all four themes, hover, pin, click-through, bounds and existing character/settings flows. Smoke screenshots use labelled fixture usage, not live billing data.
+
+## Direct manipulation
+
+A short click opens settings. Holding the character for 220 ms or moving the pointer more than 5 px starts a captured drag. The body lifts, leans with horizontal movement, and the cat's existing leg joints settle into a hanging pose without stretching the limb segments. Release eases the character down and suppresses the settings click. Supply polling and task recovery continue independently.
+
+Manual placement overrides visual task following until the user chooses Resume automatic following (or resets the pet). Switching the selected task does not move a manually placed pet. Coordinates are saved in `pet-position.json` in the application support directory and restored on startup, bounded to keep the pet visible. A drop is assigned to the nearest display; continuous cross-display pickup rendering has not been visually verified on multiple physical monitors.
+
+Verified with Electron input events: hold, drag, release, no accidental settings click, placement survives polling and task switches, saved placement reload, and cat joint lengths during lift. Captured drag screenshot: artifacts/pet-picked-up.png.
