@@ -40,7 +40,7 @@ export function renderSupplyCard(root:HTMLElement,s:SupplyState,c:CharacterId,la
  if(r===0&&!stale)add('div',t('额度已用尽。补给后需在 Codex 中继续任务。','Quota exhausted. Continue in Codex after it resets.'),'supply-warning');
  if(r!==null&&r>0&&r<20&&!stale)add('div',t(c==='mechanic'?'猫粮不多了':'补给不多了','Running low'),'supply-warning');
  if(stale)add('div',t('暂时没更新，先显示上次记录','Last recorded · waiting for an update'),'supply-warning');
- if(r===null)add('div',s.accountError==='codex-missing'?t('未找到 Codex 服务，请先打开 Codex。稍后自动重试。','Codex service not found. Open Codex; retrying shortly.'):s.accountError==='timeout'?t('额度读取超时，稍后自动重试','Quota request timed out · retrying shortly'):s.accountError==='unavailable'?t('暂时无法读取额度，请确认 Codex 已登录。稍后自动重试。','Quota unavailable. Check that Codex is signed in; retrying shortly.'):t('还没读到额度','Supply unavailable · checking Codex'),'supply-muted');
+ if(r===null)add('div',s.accountError==='codex-missing'?t('未找到 Codex 服务，请先打开 Codex。稍后自动重试。','Codex service not found. Open Codex; retrying shortly.'):s.accountError==='timeout'?t('额度读取超时，稍后自动重试','Quota request timed out · retrying shortly'):s.accountError==='unavailable'?t('暂时无法读取额度，稍后自动重试。','Quota unavailable; retrying shortly.'):t('还没读到额度','Supply unavailable · checking Codex'),'supply-muted');
  for(const w of a?.windows??[]){
   const label=w.minutes===10080?t('周额度','Weekly'):w.minutes===300?t('五小时额度','5-hour'):`${w.minutes/60}h`;
   const row=add('div',`${w.name} · ${label}`,'supply-row');const b=document.createElement('b');b.textContent=`${Math.round(100-w.used)}%`;row.append(b);

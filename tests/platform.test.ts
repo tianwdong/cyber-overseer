@@ -47,3 +47,12 @@ test('Explicit Codex executable is authoritative and a missing override fails',a
 test('Windows desktop enumeration runs without a shell command wrapper',{skip:process.platform!=='win32'},async()=>{
  const roots=await windowsCodexRoots();assert.ok(Array.isArray(roots));assert.ok(roots.every(p=>typeof p==='string'));
 });
+
+test('Windows discovers user-local versioned Codex service without PATH or Store access',async()=>{
+ const local=String.raw`C:\Users\EDY\AppData\Local`;
+ const binary=local+String.raw`\OpenAI\Codex\bin\8e5b6932251c2c1c\codex.exe`;
+ const actual=await findCodexBinary({platform:'win32',env:{LOCALAPPDATA:local},userVersions:async root=>{
+  assert.equal(root,local+String.raw`\OpenAI\Codex\bin`);return [{name:'8e5b6932251c2c1c',modified:100}];
+ },windowsRoots:async()=>{throw Error('Store must not be needed');},exists:async p=>{if(p!==binary)throw Error('missing');}});
+ assert.equal(actual,binary);
+});

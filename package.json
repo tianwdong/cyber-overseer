@@ -1,6 +1,6 @@
 {
   "name": "cyber-overseer",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "description": "Automatically recover failed Codex tasks with a desktop overseer.",
   "main": "dist/main.cjs",

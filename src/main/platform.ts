@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import { posix, win32 } from 'node:path';
-import { access } from 'node:fs/promises';
+import { access, readdir, stat } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 const exec = promisify(execFile);
@@ -46,21 +46,49 @@ export async function windowsCodexRoots(): Promise<string[]> {
   const roots=JSON.parse(stdout.replace(/^\uFEFF/,''));
   return Array.isArray(roots)?roots.filter((v:unknown):v is string=>typeof v==='string'&&win32.isAbsolute(v)&&!v.includes('\0')):[];
 }
-export async function findCodexBinary(options:{platform?:NodeJS.Platform;env?:NodeJS.ProcessEnv;exists?:(path:string)=>Promise<unknown>;windowsRoots?:()=>Promise<string[]>}={}): Promise<string> {
+// Desktop updates use opaque version directory names, not sortable version numbers.
+async function codexUserVersions(root:string):Promise<{name:string;modified:number}[]>{
+  const entries=await readdir(root,{withFileTypes:true});
+  return Promise.all(entries.filter(entry=>entry.isDirectory()).map(async entry=>({
+    name:entry.name,modified:await stat(win32.join(root,entry.name,'codex.exe')).then(s=>s.mtimeMs).catch(()=>0)
+  })));
+}
+type CodexBinaryOptions={userVersions?:(root:string)=>Promise<{name:string;modified:number}[]>;platform?:NodeJS.Platform;env?:NodeJS.ProcessEnv;exists?:(path:string)=>Promise<unknown>;windowsRoots?:()=>Promise<string[]>};
+// Keep discovery lazy: a working desktop service does not require enumerating every installation.
+export async function* codexBinaryCandidates(options:CodexBinaryOptions={}):AsyncGenerator<string> {
   const platform=options.platform??process.platform,env=options.env??process.env,exists=options.exists??access;
-  if(env.CYBER_OVERSEER_CODEX){await exists(env.CYBER_OVERSEER_CODEX);return env.CYBER_OVERSEER_CODEX;}
+  if(env.CYBER_OVERSEER_CODEX){await exists(env.CYBER_OVERSEER_CODEX);yield env.CYBER_OVERSEER_CODEX;return;}
   const path=platform==='win32'?win32:posix;
   const roots=platform==='win32'&&env.LOCALAPPDATA?[path.join(env.LOCALAPPDATA,'Programs','Codex'),path.join(env.LOCALAPPDATA,'Programs','ChatGPT')]:[];
   const resources=(folders:string[])=>folders.flatMap(root=>[path.join(root,'resources','codex.exe'),path.join(root,'app','resources','codex.exe')]);
   const bundled=platform==='darwin'?['/Applications/ChatGPT.app/Contents/Resources/codex','/Applications/Codex.app/Contents/Resources/codex']:resources(roots);
-  const executable=platform==='win32'?'codex.exe':'codex';
-  const search=async(candidates:string[])=>{for(const candidate of new Set(candidates)){try{await exists(candidate);return candidate;}catch{}}};
-  // Prefer the installed desktop service to a separately installed CLI/account.
-  let binary=await search(bundled);
-  if(!binary&&platform==='win32'){
-    try{binary=await search(resources(await (options.windowsRoots??windowsCodexRoots)()));}catch{/* PATH may still provide the native CLI. */}
+  const executable=platform==='win32'?'codex.exe':'codex',seen=new Set<string>();
+  async function* existing(candidates:string[]){
+    for(const candidate of candidates){
+      const key=platform==='win32'?candidate.toLowerCase():candidate;
+      if(seen.has(key))continue;seen.add(key);
+      try{await exists(candidate);}catch{continue;}
+      yield candidate;
+    }
   }
-  binary??=await search((env.PATH||'').split(path.delimiter).filter(Boolean).map(dir=>path.join(dir.replace(/^"|"$/g,''),executable)));
-  if(binary)return binary;
+  if(platform==='win32'&&env.LOCALAPPDATA){
+    const root=win32.join(env.LOCALAPPDATA,'OpenAI','Codex','bin');
+    let versions:{name:string;modified:number}[]=[];
+    try{versions=await (options.userVersions??codexUserVersions)(root);}catch{/* Older installations may only have the bundled service. */}
+    versions=versions.filter(v=>v.name!=='.'&&v.name!=='..'&&!/[\\/\0]/.test(v.name));
+    versions.sort((a,b)=>b.modified-a.modified||a.name.localeCompare(b.name));
+    yield* existing(versions.map(v=>win32.join(root,v.name,'codex.exe')));
+    yield* existing([win32.join(root,'codex.exe')]);
+  }
+  yield* existing(bundled);
+  if(platform==='win32'){
+    let registered:string[]=[];
+    try{registered=await (options.windowsRoots??windowsCodexRoots)();}catch{/* PATH may still provide the native CLI. */}
+    yield* existing(resources(registered));
+  }
+  yield* existing((env.PATH||'').split(path.delimiter).filter(Boolean).map(dir=>path.join(dir.replace(/^"|"$/g,''),executable)));
+}
+export async function findCodexBinary(options:CodexBinaryOptions={}):Promise<string>{
+  for await(const binary of codexBinaryCandidates(options))return binary;
   throw Error('Codex executable unavailable / 未找到 Codex 可执行文件；可设置 CYBER_OVERSEER_CODEX。');
 }

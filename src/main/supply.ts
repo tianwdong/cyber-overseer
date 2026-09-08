@@ -1,23 +1,40 @@
 import {priceUsage,type PriceBook,type UsageSample} from '../core/pricing';
 import {spawn} from 'node:child_process';
-import { paths, runPython, findCodexBinary } from './platform';
+import { paths, runPython, codexBinaryCandidates } from './platform';
 import {join} from 'node:path';
 import {decodeSupply,type AccountSupply,type TaskUsage,type SupplyError} from '../core/supply';
 export class SupplyReadError extends Error {constructor(readonly code:SupplyError){super(code);}}
 // Native read-only RPC; Codex owns authentication. Never start a task or consume a reset.
-export async function readAccountSupply():Promise<AccountSupply>{
- const binary=await findCodexBinary().catch(()=>{throw new SupplyReadError('codex-missing');});
+export class CodexLaunchError extends SupplyReadError {constructor(){super('unavailable');}}
+export async function readAccountSupply(options:{candidates?:AsyncIterable<string>;read?:(binary:string)=>Promise<AccountSupply>}={}):Promise<AccountSupply>{
+ let found=false;
+ try{
+  for await(const binary of options.candidates??codexBinaryCandidates()){
+   found=true;
+   try{return await (options.read??readSupplyFromBinary)(binary);}
+   catch(error){if(!(error instanceof CodexLaunchError))throw error;}
+  }
+ }catch(error){if(error instanceof SupplyReadError)throw error;throw new SupplyReadError(found?'unavailable':'codex-missing');}
+ throw new SupplyReadError(found?'unavailable':'codex-missing');
+}
+export function readSupplyFromBinary(binary:string):Promise<AccountSupply>{
  return new Promise((resolve,reject)=>{
-  const child=spawn(binary!,['app-server'],{stdio:['pipe','pipe','ignore'],windowsHide:true});let buffer='',done=false;
-  const finish=(error?:Error,value?:AccountSupply)=>{if(done)return;done=true;clearTimeout(timer);child.stdin.end();child.kill();const kill=setTimeout(()=>child.kill('SIGKILL'),1500);kill.unref();child.once('exit',()=>clearTimeout(kill));error?reject(error):resolve(value!);};
+  let child:ReturnType<typeof spawn>;
+  try{child=spawn(binary,['app-server'],{stdio:['pipe','pipe','ignore'],windowsHide:true});}
+  catch{reject(new CodexLaunchError());return;}
+  let buffer='',done=false;
+  const finish=(error?:Error,value?:AccountSupply)=>{if(done)return;done=true;clearTimeout(timer);child.stdin?.end();if(child.pid){child.kill();const kill=setTimeout(()=>child.kill('SIGKILL'),1500);kill.unref();child.once('exit',()=>clearTimeout(kill));}error?reject(error):resolve(value!);};
   const timer=setTimeout(()=>finish(new SupplyReadError('timeout')),15000);
-  const send=(v:unknown)=>child.stdin.write(JSON.stringify(v)+'\n');
-  child.stdin.on('error',()=>finish(new SupplyReadError('unavailable')));child.on('error',()=>finish(new SupplyReadError('unavailable')));child.on('exit',()=>{if(!done)finish(new SupplyReadError('unavailable'));});
-  child.stdout.on('data',chunk=>{buffer+=chunk.toString();if(buffer.length>2_000_000)return finish(new SupplyReadError('unavailable'));let k;while((k=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,k);buffer=buffer.slice(k+1);let m:any;try{m=JSON.parse(line);}catch{continue;}
+  const send=(v:unknown)=>child.stdin!.write(JSON.stringify(v)+'\n');
+  child.stdin!.on('error',()=>finish(new SupplyReadError('unavailable')));
+  child.on('error',()=>finish(child.pid?new SupplyReadError('unavailable'):new CodexLaunchError()));
+  child.on('exit',()=>{if(!done)finish(new SupplyReadError('unavailable'));});
+  child.stdout!.on('data',chunk=>{buffer+=chunk.toString();if(buffer.length>2_000_000)return finish(new SupplyReadError('unavailable'));let k;while((k=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,k);buffer=buffer.slice(k+1);let m:any;try{m=JSON.parse(line);}catch{continue;}
    if(m.id===1){if(m.error)return finish(new SupplyReadError('unavailable'));send({method:'initialized'});send({id:2,method:'account/rateLimits/read',params:null});}
    if(m.id===2){if(m.error)return finish(new SupplyReadError('unavailable'));finish(undefined,decodeSupply(m.result));}
   }});
-  send({id:1,method:'initialize',params:{clientInfo:{name:'cyber-overseer',version:'0.1.0'}}});
+  // Do not write before spawn succeeds: an EPIPE must not hide the actual launch failure.
+  child.once('spawn',()=>send({id:1,method:'initialize',params:{clientInfo:{name:'cyber-overseer',version:'0.1.0'}}}));
  });
 }
 // Stream usage metadata only; delta cumulative snapshots under their recorded model.

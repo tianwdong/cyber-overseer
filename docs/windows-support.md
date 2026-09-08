@@ -8,7 +8,7 @@ Windows x64 提供实验性安装包；真实 Codex 恢复仍待 Windows 真机�
 - 任务索引、语言和用量读取统一遵循 `CODEX_HOME`；未指定时读取用户目录下的 `.codex`。数据库保持只读。
 - Windows 使用本机命名管道 `\\.\pipe\codex-ipc`；macOS 保留 Unix socket 及文件属主检查。恢复仍根据完整任务 ID 寻找持有者，不依赖窗口焦点。
 - 安装包优先使用内置 Python 3.13.15／SQLite；源码运行可自动尝试 `py -3`、`python`、`python3`。显式 `CYBER_OVERSEER_PYTHON` 保留最高优先级；子进程不弹控制台。
-- Codex 用量服务优先发现桌面端自带的程序，包括常见独立安装目录、运行中 Codex 的资源目录和当前用户 Store 包；随后尝试 PATH 中的 `codex.exe`。也可明确指定可执行文件路径。读取失败会显示原因并约 30 秒后重试，不伪造余额。
+- Codex 用量服务优先发现 `%LOCALAPPDATA%\OpenAI\Codex\bin\<版本>\codex.exe`，按文件修改时间先尝试较新版本；随后尝试常见独立安装目录、运行中 Codex 的资源目录、当前用户 Store 包以及 PATH 中的 `codex.exe`。启动被拒绝或程序失效时继续下一候选；服务启动后的额度接口错误不会触发盲目切换。也可明确指定可执行文件路径。读取失败会显示原因并约 30 秒后重试，不伪造余额。
 - Windows 使用标准窗口标题栏和固定通知应用标识。
 - 窗口观察器只在 macOS 编译，其他平台明确返回不可定位；自动恢复不因此被禁用。
 - CI 配置包含 macOS 和 Windows：类型检查、测试、构建、双语界面冒烟截图。管道协议测试在 Windows 上创建独立随机命名管道，不连接真实任务。
@@ -17,7 +17,7 @@ Windows 管道地址参考 [OpenAI Codex 官方源码](https://github.com/openai
 
 ## 安装与打包
 
-[下载 Windows x64 预览版](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.5)，运行 `Cyber-Overseer-0.1.5-windows-x64-setup.exe`。默认按当前用户安装，提供中英文引导、应用图标、开始菜单／桌面快捷方式和卸载入口；卸载保留个人配置。安装包未签名，可能触发 SmartScreen 信誉提示。
+[下载 Windows x64 预览版](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.6)，运行 `Cyber-Overseer-0.1.6-windows-x64-setup.exe`。默认按当前用户安装，提供中英文引导、应用图标、开始菜单／桌面快捷方式和卸载入口；卸载保留个人配置。安装包未签名，可能触发 SmartScreen 信誉提示。
 
 在 Windows x64 开发机上构建：
 
@@ -48,7 +48,7 @@ $env:CODEX_HOME = 'D:\CodexData'
 npm start
 ```
 
-`CYBER_OVERSEER_CODEX` 只用于读取账户额度；自动恢复使用运行中的 Desktop IPC。尚未加入 Microsoft Store 安装目录自动发现。不要用 WSL 路径代替 Windows 原生数据目录；跨 WSL 看护不在当前支持范围内。
+`CYBER_OVERSEER_CODEX` 只用于读取账户额度；自动恢复使用运行中的 Desktop IPC。支持当前用户 Store 包与用户目录服务发现。CLI 通过浏览器登录 ChatGPT 时，额度服务沿用当前 CODEX_HOME；只运行 CLI 不代表存在 Desktop 的定向恢复入口。不要用 WSL 路径代替 Windows 原生数据目录；跨 WSL 看护不在当前支持范围内。
 
 ## 正式支持的验收门槛
 
