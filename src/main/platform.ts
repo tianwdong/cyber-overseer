@@ -16,7 +16,7 @@ export function platformPaths(platform = process.platform, env = process.env, ho
 export const paths = platformPaths();
 type Python = { binary: string; args: string[] };
 let python: Promise<Python> | undefined;
-async function findPython(): Promise<Python> {
+export async function findPython(): Promise<Python> {
   const resources = (process as NodeJS.Process & {resourcesPath?:string}).resourcesPath;
   const bundled: Python[] = !resources ? [] : process.platform === 'win32'
     ? [{binary:win32.join(resources,'python','python.exe'),args:[]}]

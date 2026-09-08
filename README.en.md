@@ -31,11 +31,11 @@ Resume interrupted tasks, attempt recovery from compaction failures, and collect
 
 If you have the DMG, open it, drag **Cyber Overseer.app** into **Applications**, and launch it. Keep Codex Desktop running and signed in. The app bundles its runtime dependencies; you do not need to install Node.js or Python separately.
 
-**[Download the macOS preview DMG](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.5)** · Apple Silicon · approximately 130 MiB. Not notarized. See [App and DMG packaging](docs/packaging.md) for installation and build details (Chinese).
+**[Download the macOS preview DMG](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.8)** · Apple Silicon · approximately 130 MiB. Not notarized. See [App and DMG packaging](docs/packaging.md) for installation and build details (Chinese).
 
 ### Windows app
 
-**[Download the Windows x64 preview installer](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.7)**. Run the `.exe` and choose an installation directory. Python and SQLite are bundled; no separate Node.js or Python installation is needed. The installer supports English and Chinese, with removal through Windows Settings.
+**[Download the Windows x64 preview installer](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.8)**. Run the `.exe` and choose an installation directory. Python and SQLite are bundled; no separate Node.js or Python installation is needed. The installer supports English and Chinese, with removal through Windows Settings.
 
 The installer is unsigned and Windows may show a reputation warning. Real Codex recovery and multi-monitor desktop behavior still need Windows validation. See [Windows support status](docs/windows-support.md) (Chinese).
 
@@ -134,3 +134,7 @@ Further documentation is currently in Chinese:
 ## License
 
 Source code is licensed under [MIT](LICENSE). Original character artwork is all rights reserved; see [asset terms](assets/ASSET-LICENSE.md). Third-party material retains its own terms; see [NOTICE](assets/CODEBURN-NOTICE.txt).
+
+### CLI watching (0.1.8, experimental)
+
+Choose **Launch CLI** in the dashboard and select a project to use the native Codex terminal. Overseer discovers root tasks launched through this entry and attempts `continue` after explicit network or compaction failures. Existing standalone CLI terminals are not taken over. Requires Codex CLI with authenticated `--remote` support (protocol checked against 0.153.4). Quitting Overseer does not actively stop the terminal. Real Windows failure recovery and exact CLI window positioning remain unverified.

@@ -13,6 +13,7 @@ export interface RecoveryRecord {
 }
 export interface RecoveryStore { read(threadId:string):Promise<RecoveryRecord|null>; save(record:RecoveryRecord):Promise<void> }
 export interface WatchdogDependencies {
+  preferContinue?:boolean;
   read(id:string):Promise<TurnState>;
   owner(id:string):Promise<string>;
   send(id:string,owner:string,messageId:string):Promise<void>;
@@ -91,6 +92,7 @@ export class Watchdog {
     }
     if(current.status==='completed'&&used>0){used=0;if(record){record={...record,attemptsUsed:0};await this.d.store.save(record);}this.d.progress?.({used:0,limit,exhausted:false});}
     let action=recoveryAction(current);
+    if(action==='compact'&&this.d.preferContinue)action='continue';
     if(!action||now<this.nextAttempt||!current.turnId)return;
     if(used>=limit){
       const notice=`${current.turnId}:${limit}`;
@@ -112,7 +114,7 @@ export class Watchdog {
     if(current.endedAt&&now-current.endedAt<5000)return;
     const owner=await this.d.owner(this.id),fresh=await this.d.read(this.id);
     if(this.stopped||used>=this.limit()||this.d.allowDispatch?.(fresh)===false||fresh.turnId!==current.turnId||fresh.status!=='failed')return;
-    if(!record||used===0)this.context={episodeId:current.turnId,failedTurnId:current.turnId,reason:action==='compact'?'compaction':isModelAtCapacity(current.error??'')?'capacity':'network'};
+    if(!record||used===0)this.context={episodeId:current.turnId,failedTurnId:current.turnId,reason:recoveryAction(current)==='compact'?'compaction':isModelAtCapacity(current.error??'')?'capacity':'network'};
     this.report('检测到可恢复的任务故障。','failed',used+1);
     const next:RecoveryRecord={context:this.context,threadId:this.id,failedTurnId:current.turnId,action,messageId:randomUUID(),phase:'pending',at:now,attemptsUsed:used+1,compactionFallback:used>0&&record?.compactionFallback};
     await this.d.store.save(next); // Durable before dispatch: crash cannot produce a blind duplicate.

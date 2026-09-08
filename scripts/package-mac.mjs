@@ -23,7 +23,7 @@ await cp('assets/icon/icon.icns',join(resources,'electron.icns'));
 await cp('artifacts/runtime/python',join(resources,'python'),{recursive:true,dereference:false,verbatimSymlinks:true});
 await trimPython(join(resources,'python'));
 await mkdir(join(resources,'licenses'),{recursive:true});
-for(const [source,name] of [['LICENSE','SOURCE-LICENSE'],['assets/ASSET-LICENSE.md','ASSET-LICENSE.md'],['node_modules/electron/dist/LICENSE','Electron-LICENSE'],['node_modules/electron/dist/LICENSES.chromium.html','Chromium-LICENSES.html'],['assets/CODEBURN-NOTICE.txt','CODEBURN-NOTICE.txt'],['node_modules/smol-toml/LICENSE','smol-toml-LICENSE']])await cp(source,join(resources,'licenses',name));
+for(const [source,name] of [['LICENSE','SOURCE-LICENSE'],['assets/ASSET-LICENSE.md','ASSET-LICENSE.md'],['node_modules/electron/dist/LICENSE','Electron-LICENSE'],['node_modules/electron/dist/LICENSES.chromium.html','Chromium-LICENSES.html'],['assets/CODEBURN-NOTICE.txt','CODEBURN-NOTICE.txt'],['node_modules/smol-toml/LICENSE','smol-toml-LICENSE'],['node_modules/ws/LICENSE','ws-LICENSE']])await cp(source,join(resources,'licenses',name));
 await cp('artifacts/runtime/provenance.json',join(resources,'licenses','python-provenance.json'));
 await writeFile(join(resources,'licenses','PROJECT-STATUS.txt'),'Experimental preview. Source code: MIT. Original character artwork: all rights reserved; see ASSET-LICENSE.md.\nPython and its bundled dependency license texts are retained inside Resources/python.\n');
 await rename(join(contents,'MacOS','Electron'),join(contents,'MacOS','Cyber Overseer'));

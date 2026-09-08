@@ -19,5 +19,5 @@ execFileSync(join(root,'python','python.exe'),['-I','-B','-c','import sqlite3,sy
 // Keep dependency licenses and DLLs; remove only development tooling.
 for(const name of ['include','libs','Scripts','Lib/test','Lib/idlelib','Lib/ensurepip'])await rm(join(root,'python',name),{recursive:true,force:true});
 const licenses=join(root,'licenses');await mkdir(licenses,{recursive:true});
-for(const [source,name] of [['LICENSE','SOURCE-LICENSE'],['assets/ASSET-LICENSE.md','ASSET-LICENSE.md'],['node_modules/electron/dist/LICENSE','Electron-LICENSE'],['node_modules/electron/dist/LICENSES.chromium.html','Chromium-LICENSES.html'],['assets/CODEBURN-NOTICE.txt','CODEBURN-NOTICE.txt'],['node_modules/smol-toml/LICENSE','smol-toml-LICENSE']])await cp(source,join(licenses,name));
+for(const [source,name] of [['LICENSE','SOURCE-LICENSE'],['assets/ASSET-LICENSE.md','ASSET-LICENSE.md'],['node_modules/electron/dist/LICENSE','Electron-LICENSE'],['node_modules/electron/dist/LICENSES.chromium.html','Chromium-LICENSES.html'],['assets/CODEBURN-NOTICE.txt','CODEBURN-NOTICE.txt'],['node_modules/smol-toml/LICENSE','smol-toml-LICENSE'],['node_modules/ws/LICENSE','ws-LICENSE']])await cp(source,join(licenses,name));
 await writeFile(join(licenses,'python-provenance.json'),JSON.stringify({project:'https://github.com/astral-sh/python-build-standalone',url,sha256},null,2)+'\n');

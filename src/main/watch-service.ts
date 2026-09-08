@@ -1,3 +1,4 @@
+import {managedCli} from './managed-cli';
 import {loadSettings} from './settings';
 import type {Settings,RetryProgress} from '../core/settings';
 import {LiveTaskStream} from './live-stream';
@@ -27,6 +28,8 @@ export async function startWatcher(id:string,report:(m:string,action?:string,att
     if(alive||!Number.isInteger(pid)||pid<1)throw new Error('该任务已有一个督工在自动恢复');
     await unlink(lock);await claim();
   }
+  const cli=!!managedCli.get(id);
+  const client=()=>{const c=managedCli.get(id);if(!c)throw new DispatchRejected('Managed CLI is disconnected');return c;};
   const currentSettings=getSettings??(()=>standaloneSettings);
   const stream=getLive?undefined:new LiveTaskStream(id,()=>{});
   const live=getLive??(()=>stream?.state);
@@ -34,11 +37,11 @@ export async function startWatcher(id:string,report:(m:string,action?:string,att
   const connect=async()=>{if(connected)return;await ipc.connect();connected=true;};
   async function checked<T>(kind:'read'|'dispatch'|'storage'|'owner',run:()=>Promise<T>):Promise<T>{try{const result=await run();health?.(kind,false);return result;}catch(error){health?.(kind,true);throw error;}}
   const store=new DiskStore();
-  const watcher=new Watchdog(id,{read:async id=>{const turn=await checked('read',()=>readTaskState(id));try{onRead?.(turn);}catch{/* Inbox observers must never block recovery. */}return turn;},store:{read:id=>checked('storage',()=>store.read(id)),save:r=>checked('storage',()=>store.save(r))},now:Date.now,report,settings:currentSettings,progress,
+  const watcher=new Watchdog(id,{preferContinue:cli,read:async id=>{const turn=await checked('read',()=>cli?client().turn(id):readTaskState(id));try{onRead?.(turn);}catch{/* Inbox observers must never block recovery. */}return turn;},store:{read:id=>checked('storage',()=>store.read(id)),save:r=>checked('storage',()=>store.save(r))},now:Date.now,report,settings:currentSettings,progress,
     allowDispatch:current=>permitsRecovery(live(),current),
     definitelyRejected:e=>e instanceof DispatchRejected,
-    owner:id=>checked('owner',async()=>{try{await connect();return await ipc.owner(id);}catch(e){connected=false;ipc.close();throw e;}}),
-    send:(id,owner,messageId)=>checked('dispatch',()=>ipc.resume(id,owner,messageId)),compact:(id,owner)=>checked('dispatch',()=>ipc.compact(id,owner))});
+    owner:id=>checked('owner',async()=>{try{if(cli){await client().read(id);return id;}await connect();return await ipc.owner(id);}catch(e){connected=false;ipc.close();throw e;}}),
+    send:(id,owner,messageId)=>checked('dispatch',()=>cli?client().queue(id,messageId):ipc.resume(id,owner,messageId)),compact:(id,owner)=>checked('dispatch',()=>{if(cli)throw new DispatchRejected('CLI uses continue recovery');return ipc.compact(id,owner);})});
   const interval=setInterval(()=>{if(!stopped){if(!getSettings)void loadSettings().then(s=>{standaloneSettings=s;}).catch(()=>{});void watcher.tick();}},2000);
   report('自动恢复已启动：监看此任务的网络及压缩故障。');
   void watcher.tick();

@@ -14,6 +14,7 @@ const names:Record<Task['status'],string>={unknown:'状态未读取',running:'�
 let selected:string|null=null,lastRows='',query='',filter='all';
 let latestState:OverseerState|undefined;
 function render(s:OverseerState) {
+ el('launch-cli').textContent=s.language==='en'?'Launch CLI':'启动 CLI';
   renderInbox(s);renderOverview(s);latestState=s;selected=s.selectedId;const lang=s.language??'zh';translateStatic(lang);updateSettings(s);renderAppUpdates(s);updateWorkshop(s.character,lang);
   document.body.classList.toggle('live-dashboard',s.mode==='live');
   const summary=watchSummary(s),issues=watchHealth(s);
@@ -148,3 +149,5 @@ el('watch-health-alert').onclick=async()=>{
  el('task-health-detail').scrollIntoView({block:'center'});
 };
 el('overview').addEventListener('overview-inbox',event=>openInbox((event as CustomEvent<string>).detail));
+
+el('launch-cli').onclick=()=>run('launch-cli');

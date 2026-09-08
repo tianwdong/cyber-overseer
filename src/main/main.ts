@@ -1,3 +1,5 @@
+import {managedCli,launchManagedCli} from './managed-cli';
+import {CliLiveTaskStream} from './cli-live-stream';
 import {companionSummary,codexTaskUrl} from '../core/companion-summary';
 import {UpdateChecker} from './updates';
 import {RELEASES_URL} from '../core/updates';
@@ -21,7 +23,7 @@ import {loadSettings,saveSettings,readCodexLanguage} from './settings';
 import {discoveryCandidates} from '../core/discovery';
 import {CodexDesktop} from './codex-ipc';
 import {LiveTaskStream} from './live-stream';
-import { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, shell, Notification } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, shell, Notification, dialog } from 'electron';
 import { join,dirname } from 'node:path';
 import { paths, runPython } from './platform';
 import { characters, isCharacterId, type CharacterAction } from '../core/characters';
@@ -134,7 +136,7 @@ async function enableWatch(id:string){
         if(state.selectedId!==id)return;
         state.recoveryMessage=message;
         if(action==='checking'||action==='exhausted')movePet();
-        void readTaskState(id).then(status=>{state.tasks=state.tasks.map(t=>t.id===id?{...t,...status}:t);publish();}).catch(()=>{});
+        void (managedCli.get(id)?.turn(id)??readTaskState(id)).then(status=>{state.tasks=state.tasks.map(t=>t.id===id?{...t,...status}:t);publish();}).catch(()=>{});
         if(action==='continue'||action==='compact'||action==='recovered'){
           state.phase='whipping';
           setTimeout(()=>{if(state.selectedId===id){state.phase='watching';movePet();publish();}},1300);
@@ -164,17 +166,21 @@ async function discoverTasks(){
   discovering=true;
   const discovery=new CodexDesktop();
   try{
-    const rows=await readTasks();
+    await managedCli.scan();
+    const diskRows=await readTasks().catch(error=>{if(managedCli.tasks.length)return [];throw error;});
+    const rows=[...diskRows.filter(t=>!managedCli.get(t.id)),...managedCli.tasks];
     state.health??={};state.health.discoveredAt=Date.now();
     state.tasks=rows.map(t=>({...state.tasks.find(old=>old.id===t.id),...t}));state.inventoryError=undefined;delete state.health.discoveryFailedAt;
     const available=new Set(rows.map(t=>t.id));
     for(const [id,stop] of watchers)if(!available.has(id)){await stop();watchers.delete(id);}
     const candidates=discoveryCandidates(rows,new Set(watchers.keys()),pausedIds,discoverySeen,Date.now());
-    if(candidates.length)await discovery.connect();
+    let desktopConnected=false;
+    if(candidates.some(t=>!managedCli.get(t.id)))try{await discovery.connect();desktopConnected=true;}catch{/* Managed CLI discovery remains available. */}
     for(let i=0;i<candidates.length;i+=4)await Promise.all(candidates.slice(i,i+4).map(async task=>{
       try{
-        await discovery.owner(task.id);
-        const current=await readTaskState(task.id);
+        const cli=managedCli.get(task.id);
+        if(!cli){if(!desktopConnected)return;await discovery.owner(task.id);}
+        const current=cli?await cli.turn(task.id):await readTaskState(task.id);
         state.tasks=state.tasks.map(t=>t.id===task.id?{...t,...current}:t);
         // A live Desktop owner distinguishes open work from abandoned disk history.
         if(!state.autoAll||quitting||pausedIds.has(task.id))return;
@@ -186,12 +192,12 @@ async function discoverTasks(){
   }catch{state.health??={};state.health.discoveryFailedAt??=Date.now();state.inventoryError='自动发现暂时失败，正在重试。已监看的任务继续运行。';publish();}
   finally{discovery.close();discovering=false;}
 }
-const streams=new Map<string,LiveTaskStream>();
+const streams=new Map<string,LiveTaskStream|CliLiveTaskStream>();
 function syncStreams(){
   if(demo)return;
   const ids=new Set([...watchers.keys(),...(state.selectedId?[state.selectedId]:[])]);
-  for(const [id,stream] of streams)if(!ids.has(id)){stream.stop();streams.delete(id);delete state.liveStates?.[id];}
-  for(const id of ids)if(!streams.has(id))streams.set(id,new LiveTaskStream(id,live=>{
+  for(const [id,stream] of streams)if(!ids.has(id)||(!!managedCli.get(id)!==(stream instanceof CliLiveTaskStream))){stream.stop();streams.delete(id);delete state.liveStates?.[id];}
+  for(const id of ids)if(!streams.has(id))streams.set(id,new (managedCli.get(id)?CliLiveTaskStream:LiveTaskStream)(id,live=>{
     state.liveStates??={};
     const previous=state.liveStates[id];
     const changed=!previous||previous.connection!==live.connection||previous.work!==live.work||previous.activity!==live.activity||previous.turnId!==live.turnId;
@@ -363,13 +369,16 @@ async function command(name: string, value?: string):Promise<OverseerState> {
       state.watchingIds=[...watchers.keys()];syncStreams();publish();movePet();
     });watchControl=run;await run;return state;
   }
-  if(name==='check-app-update'){if(demo)state.update={currentVersion:app.getVersion(),status:'current',checkedAt:Date.now()};else state.update=await updates.check(true);publish();
+  if(name==='launch-cli'){
+    if(!demo){const result=await dialog.showOpenDialog(panel,{title:state.language==='en'?'Choose a CLI project':'选择 CLI 项目文件夹',properties:['openDirectory']});
+      if(!result.canceled&&result.filePaths[0]){await launchManagedCli(result.filePaths[0],join(__dirname,'cli-launcher.py'));state.message=state.language==='en'?'Codex CLI is opening in a terminal. It follows your automatic watch setting.':'正在终端中打开 Codex CLI，将按当前自动看护设置运行。';publish();}}
+  }else if(name==='check-app-update'){if(demo)state.update={currentVersion:app.getVersion(),status:'current',checkedAt:Date.now()};else state.update=await updates.check(true);publish();
   }else if(name==='open-app-update'){const latest=demo?state.update:updates.state;if(value&&latest?.release?.version!==value)throw Error('Update information changed');if(!demo)await shell.openExternal(latest?.release?.url??RELEASES_URL);
-  }else if(name==='open-codex'){const url=codexTaskUrl({...state,inbox:inbox.entries},value??'');if(!demo)await shell.openExternal(url);
+  }else if(name==='open-codex'){if(managedCli.get(value??''))throw Error(state.language==='en'?'This task is running in its CLI terminal. Switch to that terminal.':'该任务运行在 CLI 中，请返回启动它的终端。');const url=codexTaskUrl({...state,inbox:inbox.entries},value??'');if(!demo)await shell.openExternal(url);
   }else if(name==='inbox-read-many'){const ids:unknown=JSON.parse(value??'null');if(!Array.isArray(ids)||ids.length>100||!ids.every(id=>typeof id==='string'))throw Error('Invalid inbox selection');await inbox.markReadMany(ids);state.inboxError=false;publish();movePet();
   }else if(name==='inbox-read'){await inbox.markRead(value??'');state.inboxError=false;publish();movePet();
   }else if(name==='check-recovery'){
-    if(!demo&&state.selectedId){const id=state.selectedId,status=await readTaskState(id);state.tasks=state.tasks.map(t=>t.id===id?{...t,...status}:t);state.message=state.language==='en'?'Task state refreshed. Receipts are still checked automatically.':'已重新读取任务状态，恢复回执仍在自动核对。';}
+    if(!demo&&state.selectedId){const id=state.selectedId,status=await (managedCli.get(id)?.turn(id)??readTaskState(id));state.tasks=state.tasks.map(t=>t.id===id?{...t,...status}:t);state.message=state.language==='en'?'Task state refreshed. Receipts are still checked automatically.':'已重新读取任务状态，恢复回执仍在自动核对。';}
     publish();
   }else if(name==='clear-duty'){if(state.selectedId)await journal.clear(state.selectedId);publish();
   }else if(name==='pricing'){await pricing.load();shell.showItemInFolder(pricing.path);

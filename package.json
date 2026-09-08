@@ -1,6 +1,6 @@
 {
   "name": "cyber-overseer",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "private": true,
   "description": "Automatically recover failed Codex tasks with a desktop overseer.",
   "main": "dist/main.cjs",
@@ -24,6 +24,7 @@
   "type": "commonjs",
   "devDependencies": {
     "@types/node": "26.4.1",
+    "@types/ws": "^8.18.1",
     "electron": "44.2.0",
     "electron-builder": "26.15.3",
     "esbuild": "0.28.2",
@@ -31,7 +32,8 @@
     "typescript": "7.0.2"
   },
   "dependencies": {
-    "smol-toml": "^1.8.0"
+    "smol-toml": "^1.8.0",
+    "ws": "^8.21.3"
   },
   "license": "MIT",
   "repository": {

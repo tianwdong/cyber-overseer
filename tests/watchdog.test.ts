@@ -134,3 +134,11 @@ test('fallback cooldown without an end timestamp persists and a user restart can
  h.setTime(620000);await h.watch().tick();assert.equal(h.record()?.retryNotBefore,630000);
  h.setState({status:'running',turnId:'manual-new'});h.setTime(700000);await h.watch().tick();assert.equal(h.calls.filter(c=>c==='continue').length,0);
 });
+
+test('managed CLI continues compaction failures with capped retries and preserves the cause',async()=>{
+ const h=harness({status:'failed',turnId:'old',error:'Error running remote compact task: Connection failed',endedAt:1000});
+ h.d.preferContinue=true;h.d.settings=()=>({retryAfterFailure:true,maxAttempts:1,language:'codex'});
+ const w=h.watch();await w.tick();assert.deepEqual(h.calls,['owner','continue']);assert.equal(h.record()?.context?.reason,'compaction');
+ h.setState({status:'failed',turnId:'new',error:'network error',endedAt:10000});h.setTime(100000);await w.tick();
+ assert.equal(h.calls.filter(x=>x==='continue').length,1);assert.ok(!h.calls.includes('compact'));
+});

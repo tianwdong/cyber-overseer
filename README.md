@@ -31,11 +31,11 @@
 
 已有 DMG 时，双击打开，将 **Cyber Overseer.app** 拖入 **Applications**，再启动应用。保持 Codex Desktop 已运行并登录即可；App 内置运行依赖，无需另装 Node.js 或 Python。
 
-**[下载 macOS 预览版 DMG](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.5)** · Apple Silicon · 约 130 MiB。尚未公证；安装与自行构建见 [App 与 DMG 打包](docs/packaging.md)。
+**[下载 macOS 预览版 DMG](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.8)** · Apple Silicon · 约 130 MiB。尚未公证；安装与自行构建见 [App 与 DMG 打包](docs/packaging.md)。
 
 ### Windows App
 
-**[下载 Windows x64 预览版安装程序](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.7)**。运行 `.exe`，选择安装目录即可；内置 Python／SQLite，无需另装 Node.js 或 Python。支持中英文安装界面，可从 Windows 设置卸载。
+**[下载 Windows x64 预览版安装程序](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.8)**。运行 `.exe`，选择安装目录即可；内置 Python／SQLite，无需另装 Node.js 或 Python。支持中英文安装界面，可从 Windows 设置卸载。
 
 安装包尚未代码签名，Windows 可能显示信誉提示。真实 Codex 故障恢复与多屏桌面行为仍待 Windows 真机验收，详见 [Windows 支持状态](docs/windows-support.md)。
 
@@ -136,3 +136,7 @@ npm run package:mac     # 构建本地 Apple Silicon App 与 DMG
 ## 许可
 
 源码采用 [MIT](LICENSE)。原创角色素材保留所有权利，具体范围见 [素材许可](assets/ASSET-LICENSE.md)。第三方内容适用各自声明，见 [NOTICE](assets/CODEBURN-NOTICE.txt)。
+
+### CLI 看护（0.1.8，实验性）
+
+在面板点击“启动 CLI”，选择项目目录，使用原生 Codex 终端。督工自动发现通过该入口启动的根任务，对明确的网络、压缩故障尝试发送 `continue`；普通已打开的 CLI 终端不会自动接管。需要支持认证 `--remote` 的 Codex CLI（协议按 0.153.4 核对）。关闭督工不会主动停止终端。Windows 真实故障恢复与 CLI 窗口精确定位仍待验收。
