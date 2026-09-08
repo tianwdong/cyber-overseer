@@ -14,7 +14,8 @@ import {getCharacter,type CharacterId,type CharacterAction} from '../core/charac
 import {durationOf,recoveryPerformance,restingPerformance,type Performance,type Pose} from '../core/performance';
 import {drawCharacter} from './characters';
 const canvas=document.getElementById('pet') as HTMLCanvasElement,ctx=canvas.getContext('2d')!,hit=document.getElementById('pet-hit') as HTMLButtonElement;
-let dock:DockEdge|undefined,dockAt=0,peek=0;
+let dock:DockEdge|undefined,pendingDock:DockEdge|undefined,dockAt=0,peek=0;
+let excursionActive=false,excursionDone=-1;
 let x=65,y=innerHeight-100,tx=x,ty=y,side='left',key='standby',character:CharacterId='foreman',sequence=-1,action:CharacterAction='watch',previewing=false,effectAt=-10000,last=performance.now(),active=false,frame=0;
 let live:LiveState|undefined,language:Language='zh',retry:RetryProgress|undefined,observing=false,performanceOverride:Performance|undefined,attempt=1,duration=1600;
 let facing:Facing={angle:0,heading:'right',scale:1,turning:false};
@@ -64,7 +65,7 @@ document.addEventListener('mousemove',e=>{
 });
 document.addEventListener('mouseleave',()=>{pointer=null;updatePointer();});
 hit.addEventListener('click',()=>{if(suppressClick){suppressClick=false;return;}void window.overseer.petAction('settings');});
-function startDrag(){if(!held||dragging)return;if(dock){facing={angle:dock==='right'?Math.PI:0,heading:dock==='right'?'left':'right',scale:dock==='right'?-1:1,turning:false};}dock=undefined;dragging=true;suppressClick=true;card.hidden=true;pinned=false;if(hoverTimer){clearTimeout(hoverTimer);hoverTimer=undefined;}void window.overseer.petDrag('start',x,y).catch(()=>{held=false;dragging=false;});}
+function startDrag(){if(!held||dragging)return;if(dock){facing={angle:dock==='right'?Math.PI:0,heading:dock==='right'?'left':'right',scale:dock==='right'?-1:1,turning:false};}dock=undefined;pendingDock=undefined;excursionActive=false;dragging=true;suppressClick=true;card.hidden=true;pinned=false;if(hoverTimer){clearTimeout(hoverTimer);hoverTimer=undefined;}void window.overseer.petDrag('start',x,y).catch(()=>{held=false;dragging=false;});}
 hit.addEventListener('pointerdown',e=>{if(e.button!==0)return;held=true;pointerId=e.pointerId;press={x:e.clientX,y:e.clientY,offsetX:e.clientX-x,offsetY:e.clientY-y};dragTarget={x,y};hit.setPointerCapture(e.pointerId);holdTimer=setTimeout(startDrag,220);});
 document.addEventListener('pointermove',e=>{if(!held)return;dragTarget={x:e.clientX-press.offsetX,y:e.clientY-press.offsetY};if(Math.hypot(e.clientX-press.x,e.clientY-press.y)>5)startDrag();});
 async function finishDrag(cancel=false){if(!held&&!dragging)return;held=false;if(holdTimer)clearTimeout(holdTimer);if(dragging){try{const p=await window.overseer.petDrag(cancel?'cancel':'end',x,y);if(!cancel){x=tx=p.x;y=ty=p.y;dock=p.dock;dockAt=performance.now();}}catch{tx=x;ty=y;}finally{dragging=false;if(cancel)suppressClick=false;}}if(hit.hasPointerCapture(pointerId))hit.releasePointerCapture(pointerId);updatePointer();}
@@ -74,7 +75,11 @@ hit.addEventListener('contextmenu',e=>{e.preventDefault();if(!dragging)void wind
 function resize(){const dpr=devicePixelRatio;canvas.width=innerWidth*dpr;canvas.height=innerHeight*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);}
 resize();addEventListener('resize',resize);
 window.overseer.onMove(move=>{
-  if(!dragging){if(move.dock!==dock)dockAt=performance.now();dock=move.dock;}
+  if(!dragging){
+    if(move.dock&&!dock&&!move.placementInstant&&Math.hypot(move.x-x,move.y-y)>2){pendingDock=move.dock;}
+    else{pendingDock=undefined;if(move.dock!==dock)dockAt=performance.now();dock=move.dock;}
+  }
+  excursionActive=!!move.excursion;
   supply=move.supply??supply;supplyTransition.update(supply.account,performance.now());tx=move.x;ty=move.y;side=move.side;key=move.key;if(character!==move.character){previousPose=undefined;modeAt=performance.now();}character=move.character;live=move.live;language=move.language??'zh';retry=move.retry;observing=!!move.observing;if(!card.hidden){paintCard();if(!pinned)positionCard();}
   if(move.placementInstant&&!dragging){x=tx;y=ty;}
   hit.dataset.work=live?.work??'unknown';hit.dataset.activity=live?.activity??'none';
@@ -86,6 +91,7 @@ function loop(now:number){
   // Clear the transparent surface before either pose: rotated limbs and edge transitions
   // can extend beyond the previous body bounds, especially during a fast drag.
   ctx.clearRect(0,0,innerWidth,innerHeight);
+  if(pendingDock&&!dragging&&Math.hypot(tx-x,ty-y)<=2){dock=pendingDock;pendingDock=undefined;dockAt=now;}
   if(dock&&!dragging){
     bowl=null;
     x=tx;y=ty;const right=dock==='right',progress=Math.min(1,(now-dockAt)/320),tuck=1-Math.pow(1-progress,3);
@@ -115,7 +121,9 @@ function loop(now:number){
   }else bowl=null;
   hit.dataset.supplyRemaining=String(supplyVisual.value??'unknown');hit.dataset.supplyStale=String(supplyVisual.stale);hit.dataset.supplyCue=supplyVisual.cue??'none';hit.dataset.bowlX=String(bowl?.x??'');hit.dataset.bowlY=String(bowl?.y??'');
   ctx.save();ctx.translate(x,y);
+  if(excursionActive&&moving)effectAt=now;
   const age=now-effectAt,inEffect=age>=0&&age<duration;
+  if(excursionActive&&!moving&&!dragging&&age>=duration&&excursionDone!==sequence){excursionDone=sequence;void window.overseer.petAction('performance-done',String(sequence)).catch(()=>{});}
   const next=dragging?'idle':moving?(facing.turning?'idle':'walk'):inEffect?(performanceOverride??recoveryPerformance(action,attempt)):restingPerformance(live,retry,observing);
   if(next!==mode){previousPose=characterPose(character,mode,now-modeAt,now,gait);mode=next;modeAt=now;}
   // Blend body pose at state boundaries; effects retain their own event time.

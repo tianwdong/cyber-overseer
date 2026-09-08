@@ -20,4 +20,4 @@ export type CharacterId=typeof characters[number]['id'];
 export type CharacterAction='watch'|'whip'|'compact'|'recovered'|'preview';
 export const isCharacterId=(value:unknown):value is CharacterId=>characters.some(c=>c.id===value);
 export const getCharacter=(id:CharacterId)=>characters.find(c=>c.id===id)!;
-export interface PetMove {dock?:import("./pet-placement").DockEdge;placementInstant?:boolean;supply?:import("./supply").SupplyState;x:number;y:number;side:string;label:string;key:string;character:CharacterId;action:CharacterAction;sequence:number;preview?:boolean;live?:LiveState;language?:Language;performance?:Performance;attempt?:number;retry?:RetryProgress;observing?:boolean;duration?:number}
+export interface PetMove {excursion?:boolean;dock?:import("./pet-placement").DockEdge;placementInstant?:boolean;supply?:import("./supply").SupplyState;x:number;y:number;side:string;label:string;key:string;character:CharacterId;action:CharacterAction;sequence:number;preview?:boolean;live?:LiveState;language?:Language;performance?:Performance;attempt?:number;retry?:RetryProgress;observing?:boolean;duration?:number}

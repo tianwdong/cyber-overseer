@@ -130,12 +130,13 @@ async function enableWatch(id:string){
         console.log(JSON.stringify({at:new Date().toISOString(),threadId:id,message,action}));
         state.recoveryMessages??={};state.recoveryMessages[id]=message;
         movePet();publish();
+        if(action==='continue'||action==='compact'||action==='recovered')playPet(action==='continue'?'whip':action,false,undefined,attempt??1,id);
         if(state.selectedId!==id)return;
         state.recoveryMessage=message;
         if(action==='checking'||action==='exhausted')movePet();
         void readTaskState(id).then(status=>{state.tasks=state.tasks.map(t=>t.id===id?{...t,...status}:t);publish();}).catch(()=>{});
         if(action==='continue'||action==='compact'||action==='recovered'){
-          state.phase='whipping';playPet(action==='continue'?'whip':action,false,undefined,attempt??1);
+          state.phase='whipping';
           setTimeout(()=>{if(state.selectedId===id){state.phase='watching';movePet();publish();}},1300);
         }
         publish();
@@ -220,9 +221,23 @@ function updateTray(){
 }
 
 let animation={action:'watch' as CharacterAction,sequence:0,until:0,preview:false,performance:undefined as Performance|undefined,attempt:1,duration:1600};
-function playPet(action:CharacterAction,preview=false,performance?:Performance,attempt=2){
+let animationTaskId:string|null=null;
+let excursion:{sequence:number;threadId:string|null;displayId:number;x:number;y:number;side:string;until:number}|undefined;
+function playPet(action:CharacterAction,preview=false,performance?:Performance,attempt=2,threadId:string|null=state.selectedId??null){
   const duration=durationOf(performance??recoveryPerformance(action,attempt));
-  animation={action,sequence:animation.sequence+1,until:Date.now()+duration,preview,performance,attempt,duration};movePet();
+  animation={action,sequence:animation.sequence+1,until:Date.now()+duration,preview,performance,attempt,duration};animationTaskId=threadId;
+  excursion=undefined;
+  if(manualPet?.dock&&dragWindow===null){
+    const d=screen.getAllDisplays().find(d=>d.id===manualPet!.displayId);
+    if(d){
+      let target={x:manualPet.dock==='left'?Math.min(d.bounds.width-100,manualPet.x+180):Math.max(100,manualPet.x-180),y:manualPet.y,side:manualPet.dock==='left'?'right':'left'};
+      const l=state.location;
+      if(l.kind==='located'&&l.threadId===threadId&&screen.getDisplayMatching(l.bounds).id===d.id){const a=edgeAnchor(l.bounds,d.workArea,l.row);target={x:a.x-d.bounds.x,y:a.y-d.bounds.y,side:a.side};}
+      animation.until=Date.now()+60_000;
+      excursion={sequence:animation.sequence,threadId,displayId:d.id,...target,until:animation.until};
+    }
+  }
+  movePet();
 }
 function commandError(e:Error){state.recoveryMessage=e.message;showSettings();publish();}
 function showSettings(){if(panel.isMinimized())panel.restore();panel.show();panel.focus();}
@@ -249,7 +264,7 @@ function secureWindow(win: BrowserWindow) {
 function publish() {state.accountSupply=supply.account;state.inbox=inbox.entries;state.duty=journal.entries;void notifyAttention();state.pausedIds=[...pausedIds];state.recoveringIds=[...recoveringTasks];if (panel && !panel.isDestroyed()) panel.webContents.send('state', state); }
 const placementFile=join(smoke?app.getPath('userData'):paths.stateDir,'pet-position.json');
 let placementInstant=false;
-async function clearManualPet(){manualPet=null;try{await unlink(placementFile);}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')console.warn('Could not clear pet placement');}}
+async function clearManualPet(){manualPet=null;if(excursion){excursion=undefined;animation.until=0;animation.action='watch';animation.sequence++;}try{await unlink(placementFile);}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')console.warn('Could not clear pet placement');}}
 async function loadManualPet(){try{const p=JSON.parse(await readFile(placementFile,'utf8'));if(!Number.isFinite(p.x)||!Number.isFinite(p.y))return;const d=screen.getDisplayNearestPoint(p);manualPet={displayId:d.id,...petPlacement(p.x-d.bounds.x,p.y-d.bounds.y,d.bounds.width,d.bounds.height,p.dock==='left'||p.dock==='right'?p.dock:undefined),threadId:null};placementInstant=true;}catch{}}
 let dragWindow:number|null=null;let manualPet:{displayId:number;x:number;y:number;dock?:DockEdge;threadId:string|null}|null=null;
 function movePet() {
@@ -257,8 +272,15 @@ function movePet() {
   for(const [id,w] of overlays)if(w.isDestroyed())overlays.delete(id);
   if(!overlays.size)return;
 
-  const location = state.location;
-  const animationProps={supply:currentSupply(),performance:animation.performance,attempt:animation.attempt,duration:animation.duration,retry:state.selectedId?state.retryProgress?.[state.selectedId]:undefined,observing:state.selectedId?recoveringTasks.has(state.selectedId):false,language:state.language,live:state.selectedId?state.liveStates?.[state.selectedId]:undefined,character:state.character,sequence:animation.sequence,preview:animation.preview,action:Date.now()<animation.until?animation.action:'watch'};
+  if(excursion&&Date.now()>=excursion.until){excursion=undefined;animation.until=0;}
+  const location = animationTaskId&&Date.now()<animation.until&&state.location.kind==='located'&&state.location.threadId!==animationTaskId?{kind:'unlocated' as const,reason:'hidden' as const}:state.location;
+  const petTaskId=Date.now()<animation.until?animationTaskId:state.selectedId;
+  const animationProps={supply:currentSupply(),performance:animation.performance,attempt:animation.attempt,duration:animation.duration,retry:petTaskId?state.retryProgress?.[petTaskId]:undefined,observing:petTaskId?recoveringTasks.has(petTaskId):false,language:state.language,live:petTaskId?state.liveStates?.[petTaskId]:undefined,character:state.character,sequence:animation.sequence,preview:animation.preview,action:Date.now()<animation.until?animation.action:'watch'};
+  if(excursion&&manualPet?.dock){
+    const w=overlays.get(excursion.displayId);
+    if(w){for(const [id,other] of overlays)if(id!==excursion.displayId)other.hide();w.showInactive();w.webContents.send('move-pet',{...animationProps,x:excursion.x,y:excursion.y,side:excursion.side,key:`excursion:${excursion.sequence}`,label:'',excursion:true});return;}
+    excursion=undefined;
+  }
   if(manualPet){
     const w=overlays.get(manualPet.displayId);
     if(w){for(const [id,other] of overlays)if(id!==manualPet.displayId)other.hide();w.showInactive();w.webContents.send('move-pet',{x:manualPet.x,y:manualPet.y,side:'right',key:'manual-placement',label:'',dock:manualPet.dock,placementInstant,...animationProps});placementInstant=false;return;}manualPet=null;
@@ -429,7 +451,7 @@ app.whenReady().then(async()=>{
   ipcMain.handle('pet-drag',async(event,phase,x,y)=>{
     const entry=[...overlays.entries()].find(([,w])=>w.webContents===event.sender);if(!entry||!['start','end','cancel'].includes(phase)||!Number.isFinite(x)||!Number.isFinite(y))throw Error('Invalid drag');
     const [displayId,w]=entry,d=screen.getAllDisplays().find(d=>d.id===displayId)!;
-    if(phase==='start'){dragWindow=w.id;w.setIgnoreMouseEvents(false);return {x,y};}
+    if(phase==='start'){excursion=undefined;animation.until=0;animation.action='watch';animation.sequence++;dragWindow=w.id;w.setIgnoreMouseEvents(false);return {x,y};}
     if(dragWindow!==w.id)throw Error('Drag not owned');dragWindow=null;
     if(phase==='end'){
       const world={x:x+d.bounds.x,y:y+d.bounds.y},target=screen.getDisplayNearestPoint(world);
@@ -443,7 +465,9 @@ app.whenReady().then(async()=>{
     const w=[...overlays.values()].find(w=>w.webContents===event.sender);
     if(!w)throw new Error('Unknown overlay');
     if(value!==undefined&&typeof value!=='string')throw new Error('Invalid pet target');
-    if(action==='open-codex'){
+    if(action==='performance-done'){
+      if(excursion&&String(excursion.sequence)===value&&overlays.get(excursion.displayId)?.webContents===event.sender){excursion=undefined;animation.until=0;animation.action='watch';animation.sequence++;movePet();}
+    }else if(action==='open-codex'){
       await command('open-codex',value);
     }else if(action==='result'){
       if(!inbox.entries.some(e=>e.id===value))throw new Error('Unknown result');
@@ -494,6 +518,39 @@ app.on('window-all-closed',()=>{});
 async function sampleUsageOverview(){
  const book=(await pricing.load()).book,now=Date.now(),model=Object.keys(book.models)[0];
  state.usageOverview=aggregateUsage({samples:Array.from({length:7},(_,i)=>({at:now-i*86400000,threadId:ids[i%3],project:i%2?'C:/Projects/ModelDial':'/projects/cyber-overseer',model,input:(i+1)*12000,cached:(i+1)*4000,cacheWrite:0,output:(i+1)*2000,contextTokens:16000})),files:3,scanned:3,pending:0,errors:0,excludedForks:1,fetchedAt:now},book,now);
+}
+async function excursionSmoke(){
+ const savedState={...state},savedPlacement=manualPet,savedAnimation=animation,savedTask=animationTaskId;
+ clearInterval(pollTimer);const display=screen.getPrimaryDisplay(),pet=overlays.get(display.id)!;
+ const check=(ok:boolean,message:string)=>{if(!ok)throw Error(message);};
+ const pause=()=>new Promise(r=>setTimeout(r,100));
+ state.location={kind:'located',threadId:ids[0],windowId:1,pid:process.pid,bounds:{x:display.bounds.x+350,y:display.bounds.y+150,width:400,height:350},evidence:'route'};state.selectedId=ids[0];
+ for(const [character,edge] of [['mechanic','left'],['mechanic','right'],['foreman','left'],['medic','right'],['ranger','left']] as const){
+  state.character=character;manualPet={displayId:display.id,...petPlacement(edge==='left'?22:display.bounds.width-22,250,display.bounds.width,display.bounds.height,edge),threadId:null};
+  const home=JSON.stringify(manualPet);placementInstant=true;animation.until=0;movePet();await pause();
+  check(await pet.webContents.executeJavaScript(`document.getElementById('pet-hit').dataset.docked===${JSON.stringify(edge)}`),'fixture must begin docked');
+  playPet('whip',false,undefined,1,ids[1]);
+  const outgoing=excursion!;check(!!outgoing&&outgoing.threadId===ids[1],'non-selected recovery must leave dock');
+  check(Math.abs(outgoing.x-manualPet.x)===180,'non-selected recovery must not approach a different task window');
+  await pet.webContents.executeJavaScript(`window.overseer.petAction('performance-done',${JSON.stringify(String(outgoing.sequence-1))})`);check(!!excursion,'old animation receipt ended current outing');
+  let walked=false,acted=false,returned=false;const start=Date.now();
+  while(Date.now()-start<16000){
+   await pause();const pose=await pet.webContents.executeJavaScript('({dock:document.getElementById("pet-hit").dataset.docked,mode:document.getElementById("pet-hit").dataset.performance})');
+   if(!pose.dock&&pose.mode==='walk')walked=true;
+   if(!pose.dock&&pose.mode==='tap'&&!acted){acted=true;await writeFile(join(artifactDir,`excursion-${character}-${edge}.png`),(await pet.webContents.capturePage()).toPNG());}
+   if(acted&&pose.dock===edge){returned=true;break;}
+  }
+  check(walked&&acted&&returned,`${character}/${edge} must walk out, act, and return`);
+  check(JSON.stringify(manualPet)===home&&state.selectedId===ids[0],'outing changed saved placement or selected task');
+ }
+ playPet('whip',false,undefined,1,ids[0]);
+ const anchor=edgeAnchor(state.location.bounds,display.workArea);
+ check(excursion?.x===anchor.x-display.bounds.x&&excursion?.y===anchor.y-display.bounds.y,'verified task must use its own window anchor');
+ await pet.webContents.executeJavaScript("window.overseer.petDrag('start',200,250)");
+ check(!excursion,'drag must cancel the outing');
+ await pet.webContents.executeJavaScript("window.overseer.petDrag('cancel',200,250)");
+ state=savedState;manualPet=savedPlacement;animation=savedAnimation;animationTaskId=savedTask;excursion=undefined;placementInstant=true;movePet();
+ console.log(JSON.stringify({ok:true,checks:['all four docked companions leave and return','cat works from both edges','action plays after arrival','non-selected recovery animates without selecting or sending','stale animation receipts ignored','manual placement preserved']}));
 }
 async function updateSmoke(){
  const saved={...state},pause=()=>new Promise(r=>setTimeout(r,150)),check=(ok:boolean,message:string)=>{if(!ok)throw Error(message);};
@@ -910,7 +967,7 @@ movePet();pollTimer=setInterval(()=>void tick(),1000);
   assert(await panel.webContents.executeJavaScript('document.getElementById("recovery-handoff").hidden && document.getElementById("watch-health-alert").hidden'),'paused tasks kept handoff or task-health alerts');
   Object.assign(state,savedHandoff);publish();
   console.log(JSON.stringify({ok:true,checks:['overview metrics quota and exact task navigation','completion inbox read state and bilingual dialog','search keyboard navigation and explicit clear','title/project/full-ID search','attention and watching filters','empty result and return to selected task','filters never change watch scope','unconfirmed handoff and read-only check','incident history groups by failure','adapter health warning and pause suppression','bilingual handoff at minimum width','isolated smoke profile','duplicate-title identity','hidden target release','standby window visible','standby character pixels','forward travel and turn before move','hold to lift and drag','drop settles without opening settings','manual placement survives polling','character hover','continuous equipment at 85/12/3 percent','stationary cat food dock','limiting window label','four supply themes and quota hover','pinned supply card','transparent click-through','click opens settings','context menu','visible target binding','dashboard render','whip animation dispatch','four character selections','12 character action previews','56 character performances','three anatomical companion rigs','scrubbable motion studio','preview isolation','character workshop render','six live state/activity transitions','retry settings defaults and edits','Chinese and English settings','English interface coverage','localized native menu and character'],screenshots:dir}));
-  await companionSmoke();await updateSmoke();quitting=true;app.quit();
+  await companionSmoke();await excursionSmoke();await updateSmoke();quitting=true;app.quit();
 }
 
 async function interfaceSmoke(){
@@ -1023,6 +1080,6 @@ async function interfaceSmoke(){
 
   }
  }
- await companionSmoke();await updateSmoke();
+ await companionSmoke();await excursionSmoke();await updateSmoke();
  console.log(JSON.stringify({ok:true,checks:['four characters dragged from both edges','zero stale pixels after diagonal drag and drop','docked placement persistence','840 and 1120 desktop widths','Chinese and English daily layout','long task titles','independent list scrolling','recovery action visible']}));quitting=true;clearInterval(pollTimer);app.exit(0);
 }
