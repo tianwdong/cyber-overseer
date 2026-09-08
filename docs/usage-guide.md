@@ -26,7 +26,7 @@
 
 ## 快速开始
 
-已有本地 DMG 时，打开后将 **Cyber Overseer.app** 拖入 Applications。App 内置运行依赖，无需另装 Node.js 或 Python；目前尚无公开下载链接。构建方式与签名状态见 [App 与 DMG 打包](packaging.md)。
+已有本地 DMG 时，打开后将 **Cyber Overseer.app** 拖入 Applications。App 内置运行依赖，无需另装 Node.js 或 Python；可从 [GitHub Releases](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.2) 下载。构建方式与签名状态见 [App 与 DMG 打包](packaging.md)。
 
 以下为源码运行方式：
 

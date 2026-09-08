@@ -31,11 +31,11 @@ Resume interrupted tasks, attempt recovery from compaction failures, and collect
 
 If you have the DMG, open it, drag **Cyber Overseer.app** into **Applications**, and launch it. Keep Codex Desktop running and signed in. The app bundles its runtime dependencies; you do not need to install Node.js or Python separately.
 
-**[Download the macOS preview DMG](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.0)** · Apple Silicon · approximately 130 MiB. Not notarized. See [App and DMG packaging](docs/packaging.md) for installation and build details (Chinese).
+**[Download the macOS preview DMG](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.2)** · Apple Silicon · approximately 130 MiB. Not notarized. See [App and DMG packaging](docs/packaging.md) for installation and build details (Chinese).
 
 ### Windows app
 
-**[Download the Windows x64 preview installer](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.1)**. Run the `.exe` and choose an installation directory. Python and SQLite are bundled; no separate Node.js or Python installation is needed. The installer supports English and Chinese, with removal through Windows Settings.
+**[Download the Windows x64 preview installer](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.2)**. Run the `.exe` and choose an installation directory. Python and SQLite are bundled; no separate Node.js or Python installation is needed. The installer supports English and Chinese, with removal through Windows Settings.
 
 The installer is unsigned and Windows may show a reputation warning. Real Codex recovery and multi-monitor desktop behavior still need Windows validation. See [Windows support status](docs/windows-support.md) (Chinese).
 
@@ -52,7 +52,7 @@ To explore the companions and dashboard first, run `npm run dev`. The demo uses 
 
 Automatic monitoring is enabled on first launch. Click the companion to open settings and adjust retries or language. The language follows Codex by default. Closing the dashboard leaves the overseer running in the system tray; use the tray menu to quit.
 
-The source version includes **app update reminders**. It checks about every six hours and matches installers to your OS and architecture. Check manually or disable automatic checks in Settings. Read the release notes and install when convenient; checking does not interrupt your tasks. [Update behavior and privacy](docs/app-updates.md)
+Version 0.1.2 includes **app update reminders**. It checks about every six hours and matches installers to your OS and architecture. Check manually or disable automatic checks in Settings. Read the release notes and install when convenient; checking does not interrupt your tasks. [Update behavior and privacy](docs/app-updates.md)
 
 
 ## Rest while your plan keeps moving

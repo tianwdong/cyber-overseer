@@ -1,8 +1,8 @@
 # 应用更新 / App updates
 
-源码版本 0.1.2 增加更新提醒。已经发布的 0.1.0 macOS、0.1.1 Windows 安装包不包含此功能，需要先安装后续提供更新提醒的版本，或从源码运行。本次源码推送不等于发布了新安装包。
+0.1.2 的 macOS 和 Windows 安装包均包含更新提醒。旧版 0.1.0 macOS、0.1.1 Windows 安装包不包含此功能，需要先从 [发布页面](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.2) 手动升级一次。
 
-The feature is included in source version 0.1.2. Existing 0.1.0 macOS and 0.1.1 Windows installers do not include it. Install a later build with this feature, or run from source. A source push alone does not publish new installers.
+Both macOS and Windows installers for 0.1.2 include update reminders. Older 0.1.0 macOS and 0.1.1 Windows installers need a one-time manual upgrade from the [release page](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.2).
 
 - 启动后检查，并约每 6 小时检查一次；设置里的“立即检查”可手动刷新，连续请求至少间隔一分钟。可取消“自动检查应用更新”并保存。
 - 显示当前版本、上次成功检查时间以及新版本入口。应用在后台时，同一版本的系统提醒只发送一次；面板内可选择稍后查看。网络失败不会显示“已是最新”，也不影响任务看护。
