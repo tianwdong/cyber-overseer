@@ -20,6 +20,7 @@ try {
   Get-Content $err
   if ($process.ExitCode -ne 0) { throw "Packaged smoke failed: $($process.ExitCode)" }
   if (!(Select-String -Path $out -Pattern 'packaged-runtime' -Quiet)) { throw 'Bundled runtime proof missing' }
+  if (!(Select-String -Path $out -Pattern 'tray-icon-ok' -Quiet)) { throw 'Packaged tray icon decode proof missing' }
   $screenshots = Join-Path ([System.IO.Path]::GetTempPath()) 'cyber-overseer-smoke'
   if (!(Test-Path (Join-Path $screenshots 'interface-en-840.png'))) { throw 'Installed UI screenshot missing' }
   Copy-Item (Join-Path $screenshots '*.png') $evidence.FullName

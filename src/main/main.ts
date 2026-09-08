@@ -498,8 +498,13 @@ app.whenReady().then(async()=>{
   await createOverlays();
   panel.on('close',e=>{if(!quitting&&!smoke){e.preventDefault();panel.hide();if(demo){state.location={kind:'unlocated',reason:'hidden'};}movePet();}});
   panel.on('move',()=>{if(demo)void tick();});panel.on('resize',()=>{if(demo)void tick();});panel.on('minimize',()=>{if(demo)void tick();});
-  const icon=nativeImage.createFromDataURL('data:image/svg+xml;base64,'+Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect x="4" y="6" width="16" height="13" rx="3" fill="black"/><path d="M8 3h8v4H8z" fill="black"/><circle cx="9" cy="12" r="2" fill="white"/><circle cx="15" cy="12" r="2" fill="white"/></svg>').toString('base64'));
-  tray=new Tray(icon);tray.setToolTip('Cyber Overseer');updateTray();
+  // nativeImage does not support SVG data URLs. Use packaged native formats.
+  const iconPath=join(__dirname,'assets','icon',process.platform==='win32'?'icon.ico':'icon.png');
+  const sourceIcon=nativeImage.createFromPath(iconPath);
+  if(sourceIcon.isEmpty())throw Error('Packaged tray icon could not be decoded');
+  const icon=sourceIcon.resize({width:18,height:18});
+  if(smoke){await mkdir(artifactDir,{recursive:true});await writeFile(join(artifactDir,'tray-icon.png'),icon.toPNG());console.log('tray-icon-ok');}
+  tray=new Tray(process.platform==='win32'?iconPath:icon);tray.setToolTip('Cyber Overseer');updateTray();
   tray.on('click',()=>panel.show());
   if(!smoke){screen.on('display-metrics-changed',()=>void createOverlays());screen.on('display-added',()=>void createOverlays());screen.on('display-removed',()=>void createOverlays());}
   pollTimer=setInterval(()=>void tick().catch(()=>{state.location={kind:'unlocated',reason:'unavailable'};movePet();publish();}),1000);

@@ -2,6 +2,8 @@ import { build } from 'esbuild';
 import { mkdir, copyFile, cp } from 'node:fs/promises';
 await mkdir('dist', { recursive: true });
 await copyFile('src/main/cli/launcher.py','dist/cli-launcher.py');
+await mkdir('dist/assets/icon',{recursive:true});
+await Promise.all(['icon.png','icon.ico'].map(name=>copyFile(`assets/icon/${name}`,`dist/assets/icon/${name}`)));
 await cp('assets/characters','dist/assets/characters',{recursive:true});
 await Promise.all([
   build({ entryPoints: ['src/main/main.ts'], bundle: true, platform: 'node', format: 'cjs', outfile: 'dist/main.cjs', external: ['electron'] }),
