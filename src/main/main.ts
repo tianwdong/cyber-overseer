@@ -1027,9 +1027,10 @@ async function interfaceSmoke(){
  const pet=[...overlays.values()][0];
  await new Promise(r=>setTimeout(r,1800));
  const sequenceBefore=animation.sequence;
- await pet.webContents.executeJavaScript(`(()=>{const r=document.getElementById('pet-hit').getBoundingClientRect(),x=r.x+r.width/2,y=r.y+70;for(const dx of [-20,20,-20,20,-20])document.dispatchEvent(new MouseEvent('mousemove',{clientX:x+dx,clientY:y}));})()`);
- await new Promise(r=>setTimeout(r,100));
- check(await pet.webContents.executeJavaScript('document.getElementById("pet-hit").dataset.petResponse==="true"'),'stroking did not produce a local response');
+ // Dispatch and observe in renderer frames: a main-process sleep can miss the
+ // short response animation when CI stalls IPC or rendering.
+ const stroked=await pet.webContents.executeJavaScript(`new Promise(resolve=>requestAnimationFrame(()=>{const r=document.getElementById('pet-hit').getBoundingClientRect(),x=r.x+r.width/2,y=r.y+70;for(const dx of [-20,20,-20,20,-20])document.dispatchEvent(new MouseEvent('mousemove',{clientX:x+dx,clientY:y}));requestAnimationFrame(()=>resolve(document.getElementById('pet-hit').dataset.petResponse==='true'));}))`);
+ check(stroked,'stroking did not produce a local response');
  check(animation.sequence===sequenceBefore,'stroking changed recovery animation dispatch');
 
  await pet.webContents.executeJavaScript(`window.dragEvents=[];window.addEventListener('error',e=>window.dragEvents.push({error:e.message}));for(const type of ['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture','blur'])window.addEventListener(type,e=>{if(type==='pointermove'&&!e.buttons)return;window.dragEvents.push({type,target:e.target.id,x:e.clientX,y:e.clientY,buttons:e.buttons});},true);`);
