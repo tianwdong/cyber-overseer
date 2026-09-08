@@ -528,6 +528,7 @@ async function excursionSmoke(){
  for(const [character,edge] of [['mechanic','left'],['mechanic','right'],['foreman','left'],['medic','right'],['ranger','left']] as const){
   state.character=character;manualPet={displayId:display.id,...petPlacement(edge==='left'?22:display.bounds.width-22,250,display.bounds.width,display.bounds.height,edge),threadId:null};
   const home=JSON.stringify(manualPet);placementInstant=true;animation.until=0;movePet();await pause();
+  for(let wait=0;wait<30&&!await pet.webContents.executeJavaScript(`document.getElementById('pet-hit').dataset.docked===${JSON.stringify(edge)}`);wait++)await pause();
   check(await pet.webContents.executeJavaScript(`document.getElementById('pet-hit').dataset.docked===${JSON.stringify(edge)}`),'fixture must begin docked');
   playPet('whip',false,undefined,1,ids[1]);
   const outgoing=excursion!;check(!!outgoing&&outgoing.threadId===ids[1],'non-selected recovery must leave dock');
@@ -584,7 +585,8 @@ async function companionSmoke(){
  manualPet={displayId:display.id,x:display.bounds.width-190,y:display.bounds.height-170,threadId:null};placementInstant=true;animation.until=0;
  for(const language of ['zh','en'] as const){
   state.language=language;movePet();publish();await pause();
-  await pet.webContents.executeJavaScript(`(()=>{const h=document.getElementById('pet-hit').getBoundingClientRect();document.dispatchEvent(new MouseEvent('mousemove',{clientX:h.x+h.width/2,clientY:h.y+70}));})()`);await new Promise(r=>setTimeout(r,380));
+  await pet.webContents.executeJavaScript(`document.dispatchEvent(new MouseEvent('mouseleave'));(()=>{const h=document.getElementById('pet-hit').getBoundingClientRect();document.dispatchEvent(new MouseEvent('mousemove',{clientX:h.x+h.width/2,clientY:h.y+70}));})()`);
+  for(let wait=0;wait<30&&await pet.webContents.executeJavaScript('document.getElementById("supply-card").hidden');wait++)await pause();
   const card=await pet.webContents.executeJavaScript(`(()=>{const c=document.getElementById('supply-card'),r=c.getBoundingClientRect();return {hidden:c.hidden,text:c.textContent,tasks:Array.from(c.querySelectorAll('.companion-task')).map(t=>t.dataset.threadId),x:Math.floor(r.x),y:Math.floor(r.y),width:Math.ceil(r.width),height:Math.ceil(r.height)};})()`);
   check(!card.hidden&&card.tasks[0]===ids[0]&&card.tasks[1]===ids[1],'companion hover lost exact task identities');
   check(card.text.includes(language==='zh'?'修改文件':'Editing files')||language==='en'&&card.text.includes('Changing files'),'live activity missing from hover: '+card.text);
