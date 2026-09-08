@@ -122,6 +122,14 @@ async function enableWatch(id:string){
   if(watchers.has(id))return;
   if(pendingStarts.has(id))return pendingStarts.get(id);
   const start=(async()=>{
+      // Reading local history is not proof that we can control the original task.
+      if(managedCli.get(id))await managedCli.get(id)!.read(id);
+      else{
+        const probe=new CodexDesktop();
+        try{await probe.connect();await probe.owner(id);}
+        catch{throw Error(state.language==='en'?'No control connection for this task. For CLI watching, use Launch CLI; existing standalone terminals cannot be taken over.':'未找到该任务的控制连接。CLI 看护请使用“启动 CLI”；已有的普通终端无法直接接管。');}
+        finally{probe.close();}
+      }
       const stop=await startWatcher(id,(message,action,attempt,context)=>{
         if(action==='continue'||action==='compact'||action==='checking')recoveringTasks.add(id);
         if(action==='recovered'||action==='exhausted'||action==='unconfirmed'||action==='completed'||action==='waiting')recoveringTasks.delete(id);
@@ -514,7 +522,7 @@ app.whenReady().then(async()=>{
     await updates.load();state.update=updates.state;publish();scheduleUpdates();
     void refreshUsageOverview();usageTimer=setInterval(()=>void refreshUsageOverview(),15000);
     void refreshSupply();supplyTimer=setInterval(()=>void refreshSupply(),5000);
-    for(const id of new Set(initialWatches)){await command('select',id);await command('auto');}
+    for(const id of new Set(initialWatches)){try{await command('select',id);await command('auto');}catch(error){state.message=error instanceof Error?error.message:'Unable to start task watching';publish();}}
     languageTimer=setInterval(()=>void refreshLanguage(),5000);
     discoveryTimer=setInterval(()=>{void discoverTasks();void refreshPausedTitles();},5000);void discoverTasks();
     console.log(JSON.stringify({event:'desktop-ready',petVisible:[...overlays.values()].some(w=>w.isVisible()),petMode:state.location.kind==='located'?'target':'standby',character:state.character,settings:state.settings,language:state.language}));
