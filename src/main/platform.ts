@@ -38,15 +38,29 @@ export async function runPython(args: string[], options: { timeout: number; maxB
   const runtime = await (python ??= findPython().catch(error => { python = undefined; throw error; }));
   return exec(runtime.binary, [...runtime.args, '-I', '-B', ...args], { ...options, encoding: 'utf8', windowsHide: true });
 }
-export async function findCodexBinary(): Promise<string> {
-  if (process.env.CYBER_OVERSEER_CODEX) {
-    await access(process.env.CYBER_OVERSEER_CODEX);
-    return process.env.CYBER_OVERSEER_CODEX;
+// Only executable paths from the running desktop or registered current-user packages.
+// Never execute PowerShell output as code, or search other users' installations.
+export async function windowsCodexRoots(): Promise<string[]> {
+  const script = `[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); $ErrorActionPreference='SilentlyContinue'; $roots=@(); Get-CimInstance Win32_Process -Filter "Name = 'Codex.exe' OR Name = 'ChatGPT.exe'" | ForEach-Object { if ($_.ExecutablePath) { $roots += [System.IO.Path]::GetDirectoryName($_.ExecutablePath) } }; Get-AppxPackage '*Codex*' | ForEach-Object { if ($_.InstallLocation) { $roots += $_.InstallLocation } }; ConvertTo-Json -Compress -InputObject @($roots | Select-Object -Unique)`;
+  const {stdout}=await exec('powershell.exe',['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{timeout:10000,maxBuffer:256*1024,windowsHide:true,encoding:'utf8'});
+  const roots=JSON.parse(stdout.replace(/^\uFEFF/,''));
+  return Array.isArray(roots)?roots.filter((v:unknown):v is string=>typeof v==='string'&&win32.isAbsolute(v)&&!v.includes('\0')):[];
+}
+export async function findCodexBinary(options:{platform?:NodeJS.Platform;env?:NodeJS.ProcessEnv;exists?:(path:string)=>Promise<unknown>;windowsRoots?:()=>Promise<string[]>}={}): Promise<string> {
+  const platform=options.platform??process.platform,env=options.env??process.env,exists=options.exists??access;
+  if(env.CYBER_OVERSEER_CODEX){await exists(env.CYBER_OVERSEER_CODEX);return env.CYBER_OVERSEER_CODEX;}
+  const path=platform==='win32'?win32:posix;
+  const roots=platform==='win32'&&env.LOCALAPPDATA?[path.join(env.LOCALAPPDATA,'Programs','Codex'),path.join(env.LOCALAPPDATA,'Programs','ChatGPT')]:[];
+  const resources=(folders:string[])=>folders.flatMap(root=>[path.join(root,'resources','codex.exe'),path.join(root,'app','resources','codex.exe')]);
+  const bundled=platform==='darwin'?['/Applications/ChatGPT.app/Contents/Resources/codex','/Applications/Codex.app/Contents/Resources/codex']:resources(roots);
+  const executable=platform==='win32'?'codex.exe':'codex';
+  const search=async(candidates:string[])=>{for(const candidate of new Set(candidates)){try{await exists(candidate);return candidate;}catch{}}};
+  // Prefer the installed desktop service to a separately installed CLI/account.
+  let binary=await search(bundled);
+  if(!binary&&platform==='win32'){
+    try{binary=await search(resources(await (options.windowsRoots??windowsCodexRoots)()));}catch{/* PATH may still provide the native CLI. */}
   }
-  const path = process.platform === 'win32' ? win32 : posix;
-  const bundled = process.platform === 'darwin' ? ['/Applications/ChatGPT.app/Contents/Resources/codex', '/Applications/Codex.app/Contents/Resources/codex'] : [];
-  const executable = process.platform === 'win32' ? 'codex.exe' : 'codex';
-  const candidates = [...bundled, ...(process.env.PATH || '').split(path.delimiter).filter(Boolean).map(dir => path.join(dir, executable))];
-  for (const candidate of candidates) { try { await access(candidate); return candidate; } catch {} }
+  binary??=await search((env.PATH||'').split(path.delimiter).filter(Boolean).map(dir=>path.join(dir.replace(/^"|"$/g,''),executable)));
+  if(binary)return binary;
   throw Error('Codex executable unavailable / 未找到 Codex 可执行文件；可设置 CYBER_OVERSEER_CODEX。');
 }

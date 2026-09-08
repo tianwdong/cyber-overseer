@@ -2,19 +2,20 @@ import {priceUsage,type PriceBook,type UsageSample} from '../core/pricing';
 import {spawn} from 'node:child_process';
 import { paths, runPython, findCodexBinary } from './platform';
 import {join} from 'node:path';
-import {decodeSupply,type AccountSupply,type TaskUsage} from '../core/supply';
+import {decodeSupply,type AccountSupply,type TaskUsage,type SupplyError} from '../core/supply';
+export class SupplyReadError extends Error {constructor(readonly code:SupplyError){super(code);}}
 // Native read-only RPC; Codex owns authentication. Never start a task or consume a reset.
 export async function readAccountSupply():Promise<AccountSupply>{
- const binary=await findCodexBinary();
+ const binary=await findCodexBinary().catch(()=>{throw new SupplyReadError('codex-missing');});
  return new Promise((resolve,reject)=>{
   const child=spawn(binary!,['app-server'],{stdio:['pipe','pipe','ignore'],windowsHide:true});let buffer='',done=false;
   const finish=(error?:Error,value?:AccountSupply)=>{if(done)return;done=true;clearTimeout(timer);child.stdin.end();child.kill();const kill=setTimeout(()=>child.kill('SIGKILL'),1500);kill.unref();child.once('exit',()=>clearTimeout(kill));error?reject(error):resolve(value!);};
-  const timer=setTimeout(()=>finish(Error('Usage read timed out')),15000);
+  const timer=setTimeout(()=>finish(new SupplyReadError('timeout')),15000);
   const send=(v:unknown)=>child.stdin.write(JSON.stringify(v)+'\n');
-  child.stdin.on('error',()=>finish(Error('Codex service closed')));child.on('error',()=>finish(Error('Codex service unavailable')));child.on('exit',()=>{if(!done)finish(Error('Codex service closed'));});
-  child.stdout.on('data',chunk=>{buffer+=chunk.toString();if(buffer.length>2_000_000)return finish(Error('Invalid usage response'));let k;while((k=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,k);buffer=buffer.slice(k+1);let m:any;try{m=JSON.parse(line);}catch{continue;}
-   if(m.id===1){if(m.error)return finish(Error('Codex initialization failed'));send({method:'initialized'});send({id:2,method:'account/rateLimits/read',params:null});}
-   if(m.id===2){if(m.error)return finish(Error('Usage unavailable'));finish(undefined,decodeSupply(m.result));}
+  child.stdin.on('error',()=>finish(new SupplyReadError('unavailable')));child.on('error',()=>finish(new SupplyReadError('unavailable')));child.on('exit',()=>{if(!done)finish(new SupplyReadError('unavailable'));});
+  child.stdout.on('data',chunk=>{buffer+=chunk.toString();if(buffer.length>2_000_000)return finish(new SupplyReadError('unavailable'));let k;while((k=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,k);buffer=buffer.slice(k+1);let m:any;try{m=JSON.parse(line);}catch{continue;}
+   if(m.id===1){if(m.error)return finish(new SupplyReadError('unavailable'));send({method:'initialized'});send({id:2,method:'account/rateLimits/read',params:null});}
+   if(m.id===2){if(m.error)return finish(new SupplyReadError('unavailable'));finish(undefined,decodeSupply(m.result));}
   }});
   send({id:1,method:'initialize',params:{clientInfo:{name:'cyber-overseer',version:'0.1.0'}}});
  });

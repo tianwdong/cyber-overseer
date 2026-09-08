@@ -11,7 +11,7 @@ import {DutyJournal,type DutyKind} from './duty-journal';
 import {loadWatchPreferences,saveWatchPreferences} from './watch-preferences';
 import {watchSummary,taskExhausted} from '../core/attention';
 import {PricingCatalog} from './pricing';
-import {readAccountSupply,readUsage,repriceUsage} from './supply';
+import {readAccountSupply,SupplyReadError,readUsage,repriceUsage} from './supply';
 import type {SupplyState} from '../core/supply';
 import {performanceLabel} from '../core/companion-performance';
 import {durationOf,performances,recoveryPerformance,type Performance} from '../core/performance';
@@ -67,7 +67,7 @@ async function refreshSupply(){
  if(demo||supplyBusy)return;supplyBusy=true;
  const id=state.selectedId;
  try{
-  if(Date.now()-lastAccountRead>300_000){lastAccountRead=Date.now();try{supply.account=await readAccountSupply();}catch{if(supply.account)supply.account={...supply.account,stale:true};}}
+  if(Date.now()-lastAccountRead>(supply.accountError?30_000:300_000)){lastAccountRead=Date.now();try{supply.account=await readAccountSupply();delete supply.accountError;}catch(error){supply.accountError=error instanceof SupplyReadError?error.code:'unavailable';console.warn(JSON.stringify({event:'supply-unavailable',reason:supply.accountError}));if(supply.account)supply.account={...supply.account,stale:true};}}
   if(id&&(supply.task?.id!==id||Date.now()-lastTaskRead>30_000)){lastTaskRead=Date.now();try{const task=await readUsage(id);if(state.selectedId===id)supply.task=task;}catch{if(supply.task?.id!==id)supply.task=null;}}
   const prices=await pricing.load();if(supply.task)supply.task=repriceUsage(supply.task,prices.book,prices.error);if(prices.changed)console.log(JSON.stringify({event:'supply-ready',pricePath:pricing.path,priceModels:Object.keys(prices.book.models).length,quotaWindows:supply.account?.windows.length??0,taskPriced:supply.task?.estimatedUSD!=null,taskId:supply.task?.id}));
  }catch{console.warn('Supply refresh unavailable');}finally{supplyBusy=false;movePet();publish();}
@@ -636,6 +636,12 @@ async function smokeTest() {
   standby.webContents.send('move-pet',{...hoverAt,side:'right',key:'smoke-supply',character:'mechanic',action:'watch',sequence:9003,preview:true,supply:{account:null,task:null,title:null},language:'en'});
   await new Promise(r=>setTimeout(r,100));
   assert(await standby.webContents.executeJavaScript('document.getElementById("supply-content").textContent.includes("Supply unavailable") && !document.getElementById("supply-content").textContent.includes("0%")'),'missing quota became zero');
+  for(const language of ['zh','en'] as const){
+    standby.webContents.send('move-pet',{...hoverAt,side:'right',key:'smoke-supply',character:'mechanic',action:'watch',sequence:9003,preview:true,supply:{account:null,task:null,title:null,accountError:'codex-missing'},language});
+    await new Promise(r=>setTimeout(r,100));
+    assert(await standby.webContents.executeJavaScript(`document.getElementById('supply-content').textContent.includes(${JSON.stringify(language==='en'?'Codex service not found':'未找到 Codex 服务')})`),'quota discovery failure must be actionable');
+    await writeFile(join(dir,`supply-service-missing-${language}.png`),(await standby.webContents.capturePage()).toPNG());
+  }
   standby.webContents.sendInputEvent({type:'mouseMove',x:2,y:2});
   await new Promise(r=>setTimeout(r,50));
   assert(await standby.webContents.executeJavaScript('!document.getElementById("supply-card").hidden'),'pinned supply card vanished');

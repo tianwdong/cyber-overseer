@@ -35,7 +35,7 @@ If you have the DMG, open it, drag **Cyber Overseer.app** into **Applications**,
 
 ### Windows app
 
-**[Download the Windows x64 preview installer](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.2)**. Run the `.exe` and choose an installation directory. Python and SQLite are bundled; no separate Node.js or Python installation is needed. The installer supports English and Chinese, with removal through Windows Settings.
+**[Download the Windows x64 preview installer](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.3)**. Run the `.exe` and choose an installation directory. Python and SQLite are bundled; no separate Node.js or Python installation is needed. The installer supports English and Chinese, with removal through Windows Settings.
 
 The installer is unsigned and Windows may show a reputation warning. Real Codex recovery and multi-monitor desktop behavior still need Windows validation. See [Windows support status](docs/windows-support.md) (Chinese).
 
