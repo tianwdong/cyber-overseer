@@ -17,7 +17,7 @@ Windows 管道地址参考 [OpenAI Codex 官方源码](https://github.com/openai
 
 ## 安装与打包
 
-[下载 Windows x64 预览版](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.4)，运行 `Cyber-Overseer-0.1.4-windows-x64-setup.exe`。默认按当前用户安装，提供中英文引导、应用图标、开始菜单／桌面快捷方式和卸载入口；卸载保留个人配置。安装包未签名，可能触发 SmartScreen 信誉提示。
+[下载 Windows x64 预览版](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.5)，运行 `Cyber-Overseer-0.1.5-windows-x64-setup.exe`。默认按当前用户安装，提供中英文引导、应用图标、开始菜单／桌面快捷方式和卸载入口；卸载保留个人配置。安装包未签名，可能触发 SmartScreen 信誉提示。
 
 在 Windows x64 开发机上构建：
 

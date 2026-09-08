@@ -598,6 +598,7 @@ async function companionSmoke(){
  await pet.webContents.executeJavaScript(`document.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));`);await pause();
  await pet.webContents.executeJavaScript(`document.getElementById('pet-result').click()`);await pause();
  check(inbox.entries[0].read,'result handoff did not mark displayed entry read');
+ check(await pet.webContents.executeJavaScript('document.getElementById("supply-card").hidden'),'opening result must dismiss hover card');
  check(await panel.webContents.executeJavaScript('document.getElementById("inbox-dialog").open && document.querySelector("details[data-id=companion-result]").open'),'result handoff opened wrong entry');
  check(await pet.webContents.executeJavaScript('document.getElementById("pet-result").hidden'),'read result badge did not clear');
  await pet.webContents.executeJavaScript(`window.overseer.petAction('task',${JSON.stringify(ids[1])})`);check(state.selectedId===ids[1],'task card selected wrong duplicate title');
@@ -609,6 +610,14 @@ async function companionSmoke(){
  check(await panel.webContents.executeJavaScript('document.querySelector(".usage-total").textContent.includes("$") && document.querySelector(".usage-pricing-reason").textContent.includes("codex-auto-review")'),'missing rate hid known spend');
  await writeFile(join(artifactDir,'partial-pricing-en.png'),(await panel.webContents.capturePage()).toPNG());
  state.language='zh';publish();await pause();await writeFile(join(artifactDir,'partial-pricing-zh.png'),(await panel.webContents.capturePage()).toPNG());
+ for(const trigger of ['pet-hit','supply-settings']){
+  await pet.webContents.executeJavaScript(`document.dispatchEvent(new MouseEvent('mouseleave'));(()=>{const h=document.getElementById('pet-hit').getBoundingClientRect();document.dispatchEvent(new MouseEvent('mousemove',{clientX:h.x+h.width/2,clientY:h.y+70}));})()`);await new Promise(r=>setTimeout(r,380));
+  check(await pet.webContents.executeJavaScript('!document.getElementById("supply-card").hidden'),'card must reopen on fresh hover');
+  await pet.webContents.executeJavaScript(`document.getElementById('supply-pin').click();document.getElementById(${JSON.stringify(trigger)}).click();${trigger==='pet-hit'?"document.getElementById('pet-hit').click();":''}`);
+  await new Promise(r=>setTimeout(r,450));movePet();await pause();
+  check(panel.isVisible()&&await pet.webContents.executeJavaScript('document.getElementById("supply-card").hidden'),'opening panel must close pinned card without reopening on updates');
+ }
+ await writeFile(join(artifactDir,'panel-open-card-dismissed.png'),(await pet.webContents.capturePage()).toPNG());
  state=saved;inbox.entries=savedInbox;supply=savedSupply;manualPet=savedPlacement;publish();movePet();
  console.log(JSON.stringify({ok:true,checks:['daily activity hover in both languages','exact duplicate-title task selection','read only after opening exact result','unread badge clears immediately','pressed button survives stream update','known spend preserved with missing internal rate','native navigation validates identity without sending a turn']}));
 }

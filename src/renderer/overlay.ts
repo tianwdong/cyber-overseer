@@ -30,25 +30,27 @@ card.addEventListener('pointerdown',()=>{cardPress=true;});
 const releaseCard=()=>{if(cardPress){cardPress=false;paintCard();}};
 document.addEventListener('pointerup',()=>setTimeout(()=>{releaseCard();pressedResult=undefined;},0));document.addEventListener('pointercancel',releaseCard);window.addEventListener('blur',releaseCard);
 resultButton.addEventListener('pointerdown',()=>{pressedResult=supply.companion?.result?.id;});resultButton.addEventListener('pointercancel',()=>{pressedResult=undefined;});
-async function openCompanion(action:'task'|'result'|'open-codex',value:string){try{await window.overseer.petAction(action,value);}catch{showCard();let error=document.getElementById('companion-error');if(!error){error=document.createElement('p');error.id='companion-error';error.className='supply-warning';content.append(error);}error.textContent=language==='en'?'Unable to open. Please try again.':'暂时无法打开，请重试。';}}
+async function openCompanion(action:'settings'|'task'|'result'|'open-codex',value?:string){dismissCard();try{await window.overseer.petAction(action,value);}catch{hoverDismissed=false;showCard();let error=document.getElementById('companion-error');if(!error){error=document.createElement('p');error.id='companion-error';error.className='supply-warning';content.append(error);}error.textContent=language==='en'?'Unable to open. Please try again.':'暂时无法打开，请重试。';}}
 resultButton.onclick=()=>{const id=pressedResult??supply.companion?.result?.id;pressedResult=undefined;if(id)void openCompanion('result',id);};
 content.addEventListener('click',e=>{const button=(e.target as HTMLElement).closest<HTMLButtonElement>('button[data-pet-action]');if(button?.dataset.value)void openCompanion(button.dataset.petAction as 'task'|'result'|'open-codex',button.dataset.value);});
 function positionResult(){const c=supply.companion;resultButton.hidden=dragging||lift>.05||!c?.result;if(resultButton.hidden)return;resultButton.textContent=language==='en'?`${c!.unread} new result${c!.unread===1?'':'s'}`:`${c!.unread} 条新结果`;resultButton.setAttribute('aria-label',(language==='en'?'Review result: ':'查看结果：')+c!.result!.title);resultButton.style.left=`${Math.max(8,Math.min(innerWidth-resultButton.offsetWidth-8,dock==='left'?8:dock==='right'?innerWidth-resultButton.offsetWidth-8:x-resultButton.offsetWidth/2))}px`;resultButton.style.top=`${Math.max(8,Math.min(innerHeight-resultButton.offsetHeight-8,y+(dock?88:84)))}px`;}
 const supplyTransition=new SupplyTransition();let supplySway=0;let bowl:{x:number;y:number}|null=null;
 let supply:SupplyState={account:null,task:null,title:null},pinned=false,hoverTimer:ReturnType<typeof setTimeout>|undefined;
-let cardSignature='';
+let cardSignature='',hoverDismissed=false;
+function dismissCard(){if(hoverTimer){clearTimeout(hoverTimer);hoverTimer=undefined;}pinned=false;card.hidden=true;hoverDismissed=true;}
 function paintCard(){if(cardPress)return;const signature=JSON.stringify([supply,character,language,Math.floor(Date.now()/60000)],(key,value)=>key==='updatedAt'||key==='revision'?undefined:value);if(signature!==cardSignature){const scroll=card.scrollTop,focused=content.contains(document.activeElement)?(document.activeElement as HTMLElement).dataset.value:undefined;renderSupplyCard(content,supply,character,language);if(focused)Array.from(content.querySelectorAll<HTMLButtonElement>('button')).find(b=>b.dataset.value===focused)?.focus({preventScroll:true});card.scrollTop=scroll;cardSignature=signature;}pin.textContent=pinned?(language==='en'?'Unpin':'取消固定'):(language==='en'?'Pin card':'固定卡片');document.getElementById('supply-settings')!.textContent=language==='en'?'All tasks':'全部任务';}
 function positionCard(){const preferred=dock==='left'?72:dock==='right'?innerWidth-410:x-310;const left=Math.max(12,Math.min(innerWidth-354,preferred)),top=Math.max(12,Math.min(innerHeight-card.offsetHeight-12,y-card.offsetHeight-115));card.style.left=`${left}px`;card.style.top=`${top}px`;}
 function showCard(){paintCard();card.hidden=false;positionCard();}
 pin.addEventListener('click',()=>{pinned=!pinned;paintCard();});
-document.getElementById('supply-settings')!.addEventListener('click',()=>void window.overseer.petAction('settings'));
+document.getElementById('supply-settings')!.addEventListener('click',()=>void openCompanion('settings'));
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){void finishDrag(true);pinned=false;card.hidden=true;}});
 function updatePointer(){
  const overBody=dock&&!dragging?!!pointer&&pointer.x>=(dock==='left'?0:innerWidth-56)&&pointer.x<=(dock==='left'?56:innerWidth)&&(pointer.y>=y-55&&pointer.y<=y+85):!!pointer&&pointer.x>=x-(character==='mechanic'?90:56)&&pointer.x<=x+(character==='mechanic'?80:56)&&pointer.y>=y-100&&pointer.y<=y+60;
  const rect=card.getBoundingClientRect(),overCard=!card.hidden&&!!pointer&&pointer.x>=rect.left-16&&pointer.x<=rect.right+16&&pointer.y>=rect.top-16&&pointer.y<=rect.bottom+16;
  const resultRect=resultButton.getBoundingClientRect(),overResult=!resultButton.hidden&&!!pointer&&pointer.x>=resultRect.left-4&&pointer.x<=resultRect.right+4&&pointer.y>=resultRect.top-4&&pointer.y<=resultRect.bottom+4;
  const over=held||dragging||overBody||overCard||overResult;
- if(!held&&!dragging&&overBody&&card.hidden&&!hoverTimer)hoverTimer=setTimeout(()=>{hoverTimer=undefined;if(overPet)showCard();},300);
+ if(!overBody&&!overCard)hoverDismissed=false;
+ if(!hoverDismissed&&!held&&!dragging&&overBody&&card.hidden&&!hoverTimer)hoverTimer=setTimeout(()=>{hoverTimer=undefined;if(overPet&&!hoverDismissed)showCard();},300);
  if(!over){if(hoverTimer){clearTimeout(hoverTimer);hoverTimer=undefined;}if(!pinned)card.hidden=true;}
  if(over!==overPet){overPet=over;window.overseer.petPointer(over);}
 }
@@ -64,7 +66,7 @@ document.addEventListener('mousemove',e=>{
  pointer={x:e.clientX,y:e.clientY};updatePointer();
 });
 document.addEventListener('mouseleave',()=>{pointer=null;updatePointer();});
-hit.addEventListener('click',()=>{if(suppressClick){suppressClick=false;return;}void window.overseer.petAction('settings');});
+hit.addEventListener('click',()=>{if(suppressClick){suppressClick=false;return;}void openCompanion('settings');});
 function startDrag(){if(!held||dragging)return;if(dock){facing={angle:dock==='right'?Math.PI:0,heading:dock==='right'?'left':'right',scale:dock==='right'?-1:1,turning:false};}dock=undefined;pendingDock=undefined;excursionActive=false;dragging=true;suppressClick=true;card.hidden=true;pinned=false;if(hoverTimer){clearTimeout(hoverTimer);hoverTimer=undefined;}void window.overseer.petDrag('start',x,y).catch(()=>{held=false;dragging=false;});}
 hit.addEventListener('pointerdown',e=>{if(e.button!==0)return;held=true;pointerId=e.pointerId;press={x:e.clientX,y:e.clientY,offsetX:e.clientX-x,offsetY:e.clientY-y};dragTarget={x,y};hit.setPointerCapture(e.pointerId);holdTimer=setTimeout(startDrag,220);});
 document.addEventListener('pointermove',e=>{if(!held)return;dragTarget={x:e.clientX-press.offsetX,y:e.clientY-press.offsetY};if(Math.hypot(e.clientX-press.x,e.clientY-press.y)>5)startDrag();});
