@@ -72,7 +72,10 @@ function render(s:OverseerState) {
   el('handoff-message').textContent=handoff?(lang==='en'?`Recovery has been unconfirmed since ${new Date(progress!.unconfirmed!.since).toLocaleTimeString('en-US')}. Check the original Codex task. We keep checking receipts without sending again; pause this task below if you take over.`:`自 ${new Date(progress!.unconfirmed!.since).toLocaleTimeString('zh-CN')} 起仍未确认恢复。请查看原 Codex 任务；督工继续核对回执，不会重复发送。接手后可在下方暂停此任务看护。`):'';
   el('check-recovery').textContent=lang==='en'?'Check again':'重新检查';
   if(handoff){el('task-status').textContent=lang==='en'?'Recovery unconfirmed':'恢复结果未确认';el('task-status').parentElement!.dataset.state='waiting';}
-  el('message').textContent=handoff?(lang==='en'?'Recovery unconfirmed. Check the original task; no duplicate request will be sent.':'恢复结果未确认，请查看原任务；督工不会重复发送请求。'):s.selectedId&&taskExhausted(s,s.selectedId)?(lang==='en'?`Automatic recovery exhausted (${progress!.used}/${progress!.limit}). Continue in Codex, or adjust the retry limit in Settings.`:`自动恢复已用尽（${progress!.used}/${progress!.limit} 次）。请在 Codex 中继续，或在设置中调整恢复上限。`):live?.connection==='live'&&['running','idle','review','waiting','retrying'].includes(live.work)?tr(live.label,lang):s.selectedId?s.recoveryMessages?.[s.selectedId]??s.recoveryMessage??s.message:s.message;
+  const taskHealth=issues.filter(i=>i.threadId===s.selectedId);
+  el('message').textContent=taskHealth.length?(taskHealth.map(i=>healthLabel(i.kind,lang==='en')).join(' · ')+' · '+(s.recoveryMessages?.[s.selectedId!]??(lang==='en'?'Waiting for diagnostic details':'等待具体错误详情'))):handoff?(lang==='en'?'Recovery unconfirmed. Check the original task; no duplicate request will be sent.':'恢复结果未确认，请查看原任务；督工不会重复发送请求。'):s.selectedId&&taskExhausted(s,s.selectedId)?(lang==='en'?`Automatic recovery exhausted (${progress!.used}/${progress!.limit}). Continue in Codex, or adjust the retry limit in Settings.`:`自动恢复已用尽（${progress!.used}/${progress!.limit} 次）。请在 Codex 中继续，或在设置中调整恢复上限。`):live?.connection==='live'&&['running','idle','review','waiting','retrying'].includes(live.work)?tr(live.label,lang):s.selectedId?s.recoveryMessages?.[s.selectedId]??s.recoveryMessage??s.message:s.message;
+  el('task-health-detail').hidden=!taskHealth.length;
+  el('task-health-detail').textContent=taskHealth.length?el('message').textContent:'';
   if(!isDemo)el('shift-state').textContent=lang==='en'?`Watching ${s.watchingIds.length} ${s.watchingIds.length===1?'task':'tasks'} · ${summary.attention} ${summary.attention===1?'needs':'need'} you`:`看护 ${s.watchingIds.length} 个任务 · ${summary.attention} 个需要处理`;
   el('inventory-error').textContent=s.inventoryError??'';
   el('stage-label').textContent=isDemo?'模拟 Codex 窗口':'所选任务 · 信息卡';
@@ -129,7 +132,19 @@ el('inbox-dialog').addEventListener('inbox-open-task',async event=>{
  catch{el('inbox-error').hidden=false;el('inbox-error').textContent=document.documentElement.lang==='en'?'Unable to open this task. The saved result is still available.':'暂时无法打开任务，仍可查看已保存的结果。';}
 });
 
+el('watch-health-alert').onclick=async()=>{
+ const issue=latestState&&watchHealth(latestState).find(i=>i.threadId);
+ if(!issue?.threadId)return;
+ await run('select',issue.threadId);showDashboardPage('tasks');
+ el('task-health-detail').scrollIntoView({block:'center'});
+};
 el('overview').addEventListener('overview-task',async event=>{try{const next=await window.overseer.command('select',(event as CustomEvent<string>).detail);resetTaskFilters();render(next);showDashboardPage('tasks');document.querySelector('.target-area')!.scrollTop=0;}catch{el('message').textContent=document.documentElement.lang==='en'?'Unable to open this task.':'暂时无法打开此任务。';}});
 function openInbox(id?:string){document.querySelectorAll<HTMLDialogElement>('dialog[open]').forEach(d=>d.close());(el('inbox-dialog') as HTMLDialogElement).showModal();if(id){const card=Array.from(el('inbox-list').querySelectorAll<HTMLDetailsElement>('details')).find(d=>d.dataset.id===id);if(card){card.open=true;card.scrollIntoView({block:'nearest'});}}}
 window.overseer.onInbox(openInbox);
+el('watch-health-alert').onclick=async()=>{
+ const issue=latestState&&watchHealth(latestState).find(i=>i.threadId);
+ if(!issue?.threadId)return;
+ await run('select',issue.threadId);showDashboardPage('tasks');
+ el('task-health-detail').scrollIntoView({block:'center'});
+};
 el('overview').addEventListener('overview-inbox',event=>openInbox((event as CustomEvent<string>).detail));

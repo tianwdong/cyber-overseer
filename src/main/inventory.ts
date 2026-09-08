@@ -24,7 +24,7 @@ export async function readTasks(codexHome=paths.codexHome): Promise<Task[]> {
   return rows.map((task:Task)=>({...task,title:titles.get(task.id)??task.title}));
 }
 
-export async function readTaskState(id: string): Promise<TurnState> {
+export async function readTaskState(id: string, codexHome=paths.codexHome): Promise<TurnState> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error('Invalid task id');
   const script = `
 import sqlite3, pathlib, json, sys
@@ -33,7 +33,9 @@ c=sqlite3.connect((root/'state_5.sqlite').as_uri()+'?mode=ro',uri=True,timeout=2
 row=c.execute('select rollout_path from threads where id=? and archived=0',(sys.argv[1],)).fetchone()
 if not row: raise RuntimeError('Task unavailable')
 p=pathlib.Path(row[0]).resolve()
-if not any(p.is_relative_to((root/d).resolve()) for d in ['sessions','archived_sessions']): raise RuntimeError('Unexpected rollout path')
+# Compare directory identity too: Windows extended paths can name the same directory.
+allowed=[(root/d).resolve() for d in ['sessions','archived_sessions']]
+if not any(parent==base or (base.is_dir() and parent.samefile(base)) for parent in p.parents for base in allowed): raise RuntimeError('Unexpected rollout path')
 with p.open('rb') as f:
  first=json.loads(f.readline())
  if first.get('type')!='session_meta' or first.get('payload',{}).get('id')!=sys.argv[1]: raise RuntimeError('Task identity mismatch')
@@ -55,6 +57,13 @@ with p.open('rb') as f:
  print(json.dumps(result))
 c.close()
 `;
-  const { stdout } = await runPython(['-c', script, id, paths.codexHome], { timeout: 5000, maxBuffer: 512 * 1024 });
-  return reduceRollout(JSON.parse(stdout));
+  try {
+    const { stdout } = await runPython(['-c', script, id, codexHome], { timeout: 5000, maxBuffer: 512 * 1024 });
+    return reduceRollout(JSON.parse(stdout));
+  } catch(error) {
+    // execFile.message includes the entire embedded script. Show only the actual diagnostic.
+    const e=error as {stderr?:string;killed?:boolean;code?:string};
+    const detail=e.stderr?.trim().split(/\r?\n/).at(-1)?.slice(0,500);
+    throw new Error(detail|| (e.killed?'Task log read timed out':`Task log read failed (${e.code??'invalid response'})`));
+  }
 }

@@ -45,7 +45,9 @@ c=sqlite3.connect((root/'state_5.sqlite').as_uri()+'?mode=ro',uri=True,timeout=2
 row=c.execute('select rollout_path from threads where id=?',(sys.argv[1],)).fetchone();c.close()
 if not row: raise RuntimeError('Task unavailable')
 p=pathlib.Path(row[0]).resolve()
-if not any(p.is_relative_to((root/d).resolve()) for d in ['sessions','archived_sessions']): raise RuntimeError('Invalid path')
+# Compare directory identity too: Windows extended paths can name the same directory.
+allowed=[(root/d).resolve() for d in ['sessions','archived_sessions']]
+if not any(parent==base or (base.is_dir() and parent.samefile(base)) for parent in p.parents for base in allowed): raise RuntimeError('Invalid path')
 model=None;usage=None;previous=None;samples=[];uncertain=False
 with p.open('rb') as f:
  first=json.loads(f.readline())

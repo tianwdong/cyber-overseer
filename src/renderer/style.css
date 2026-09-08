@@ -144,3 +144,7 @@ button.usage-day{border:0;border-radius:3px;background:none;padding:0;cursor:poi
 
 .app-updates{border-top:1px solid #ffffff16;margin-top:18px;padding-top:16px}.app-update-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}.app-update-heading h2{margin:0!important}.app-update-heading span{font:11px monospace;color:var(--muted)}#app-update-status{font-size:12px;line-height:1.6;margin:9px 0}.app-update-actions{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}.app-updates [hidden]{display:none}#settings-dialog{max-height:calc(100vh - 40px);overflow:auto}.app-updates .hint{font-size:10px}
 #app-update-banner{display:flex;align-items:center;gap:10px;flex-shrink:0;margin:0 0 12px;padding:7px 12px;border:1px solid #b895633b;border-radius:7px;background:#302a20;color:#d8bd94;font-size:11px;line-height:1.5}#app-update-banner[hidden]{display:none}#app-update-banner-text{flex:1;overflow-wrap:anywhere}#app-update-banner .quiet{font-size:11px;padding:4px 7px;flex-shrink:0;color:#dfc49e}
+
+#watch-health-alert{text-align:left;cursor:pointer}#message{overflow-wrap:anywhere;white-space:pre-wrap}
+
+#task-health-detail{padding:12px;margin:12px 0;border:1px solid #a87e494f;border-radius:7px;background:#32291f;color:#e6c39b;font-size:12px;line-height:1.6;overflow-wrap:anywhere;white-space:pre-wrap}#task-health-detail[hidden]{display:none}
