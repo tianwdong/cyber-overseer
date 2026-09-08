@@ -46,6 +46,9 @@ document.getElementById('supply-settings')!.addEventListener('click',()=>void op
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){void finishDrag(true);pinned=false;card.hidden=true;}});
 function updatePointer(){
  const overBody=dock&&!dragging?!!pointer&&pointer.x>=(dock==='left'?0:innerWidth-56)&&pointer.x<=(dock==='left'?56:innerWidth)&&(pointer.y>=y-55&&pointer.y<=y+85):!!pointer&&pointer.x>=x-(character==='mechanic'?90:56)&&pointer.x<=x+(character==='mechanic'?80:56)&&pointer.y>=y-100&&pointer.y<=y+60;
+ // Docking may finish in the animation loop after a hover card was positioned.
+ // Keep the drag handle reachable even when the card is pinned or already open.
+ if(dock&&!dragging&&!card.hidden){const a=card.getBoundingClientRect(),b=hit.getBoundingClientRect();if(a.right>b.left&&a.left<b.right&&a.bottom>b.top&&a.top<b.bottom)positionCard();}
  const rect=card.getBoundingClientRect(),overCard=!card.hidden&&!!pointer&&pointer.x>=rect.left-16&&pointer.x<=rect.right+16&&pointer.y>=rect.top-16&&pointer.y<=rect.bottom+16;
  const resultRect=resultButton.getBoundingClientRect(),overResult=!resultButton.hidden&&!!pointer&&pointer.x>=resultRect.left-4&&pointer.x<=resultRect.right+4&&pointer.y>=resultRect.top-4&&pointer.y<=resultRect.bottom+4;
  const over=held||dragging||overBody||overCard||overResult;

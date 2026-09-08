@@ -1043,6 +1043,10 @@ async function interfaceSmoke(){
    pet.setIgnoreMouseEvents(false,{forward:true});
    await dragInput('mouseMoved',head,0);await new Promise(r=>setTimeout(r,350));
    check(await pet.webContents.executeJavaScript('(()=>{const card=document.getElementById("supply-card"),a=card.getBoundingClientRect(),b=document.getElementById("pet-hit").getBoundingClientRect();return card.hidden||a.right<=b.left||a.left>=b.right||a.bottom<=b.top||a.top>=b.bottom;})()'),'quota card must not cover the docked drag handle');
+   // Reproduce a card opened before the final docking frame, without relying on timing.
+   await pet.webContents.executeJavaScript(`(()=>{const card=document.getElementById('supply-card'),r=document.getElementById('pet-hit').getBoundingClientRect();card.hidden=false;card.style.left=r.left+'px';card.style.top=r.top+'px';document.getElementById('supply-pin').click();})()`);
+   await pet.webContents.executeJavaScript('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+   check(await pet.webContents.executeJavaScript('(()=>{const a=document.getElementById("supply-card").getBoundingClientRect(),b=document.getElementById("pet-hit").getBoundingClientRect();return a.right<=b.left||a.left>=b.right||a.bottom<=b.top||a.top>=b.bottom;})()'),'pinned stale card must move clear of the docked handle');
    await dragInput('mousePressed',head,1);
    // CI rendering can lag the 220 ms hold timer; wait for the observable state.
    for(let attempt=0;attempt<30;attempt++){if(await pet.webContents.executeJavaScript('document.getElementById("pet-hit").dataset.dragging==="true"'))break;await new Promise(r=>setTimeout(r,100));}
