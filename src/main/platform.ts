@@ -42,7 +42,7 @@ export async function runPython(args: string[], options: { timeout: number; maxB
 // Never execute PowerShell output as code, or search other users' installations.
 export async function windowsCodexRoots(): Promise<string[]> {
   const script = `[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); $ErrorActionPreference='SilentlyContinue'; $roots=@(); Get-CimInstance Win32_Process -Filter "Name = 'Codex.exe' OR Name = 'ChatGPT.exe'" | ForEach-Object { if ($_.ExecutablePath) { $roots += [System.IO.Path]::GetDirectoryName($_.ExecutablePath) } }; Get-AppxPackage '*Codex*' | ForEach-Object { if ($_.InstallLocation) { $roots += $_.InstallLocation } }; ConvertTo-Json -Compress -InputObject @($roots | Select-Object -Unique)`;
-  const {stdout}=await exec('powershell.exe',['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{timeout:10000,maxBuffer:256*1024,windowsHide:true,encoding:'utf8'});
+  const {stdout}=await exec('powershell.exe',['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{timeout:20000,maxBuffer:256*1024,windowsHide:true,encoding:'utf8'});
   const roots=JSON.parse(stdout.replace(/^\uFEFF/,''));
   return Array.isArray(roots)?roots.filter((v:unknown):v is string=>typeof v==='string'&&win32.isAbsolute(v)&&!v.includes('\0')):[];
 }

@@ -58,7 +58,7 @@ with p.open('rb') as f:
 c.close()
 `;
   try {
-    const { stdout } = await runPython(['-c', script, id, codexHome], { timeout: 5000, maxBuffer: 512 * 1024 });
+    const { stdout } = await runPython(['-c', script, id, codexHome], { timeout: process.platform==='win32'?15000:5000, maxBuffer: 512 * 1024 });
     return reduceRollout(JSON.parse(stdout));
   } catch(error) {
     // execFile.message includes the entire embedded script. Show only the actual diagnostic.
