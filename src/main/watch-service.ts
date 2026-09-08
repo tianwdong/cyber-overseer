@@ -37,11 +37,11 @@ export async function startWatcher(id:string,report:(m:string,action?:string,att
   const connect=async()=>{if(connected)return;await ipc.connect();connected=true;};
   async function checked<T>(kind:'read'|'dispatch'|'storage'|'owner',run:()=>Promise<T>):Promise<T>{try{const result=await run();health?.(kind,false);return result;}catch(error){health?.(kind,true);throw error;}}
   const store=new DiskStore();
-  const watcher=new Watchdog(id,{preferContinue:cli,read:async id=>{const turn=await checked('read',()=>cli?client().turn(id):readTaskState(id));try{onRead?.(turn);}catch{/* Inbox observers must never block recovery. */}return turn;},store:{read:id=>checked('storage',()=>store.read(id)),save:r=>checked('storage',()=>store.save(r))},now:Date.now,report,settings:currentSettings,progress,
+  const watcher=new Watchdog(id,{read:async id=>{const turn=await checked('read',()=>cli?client().turn(id):readTaskState(id));try{onRead?.(turn);}catch{/* Inbox observers must never block recovery. */}return turn;},store:{read:id=>checked('storage',()=>store.read(id)),save:r=>checked('storage',()=>store.save(r))},now:Date.now,report,settings:currentSettings,progress,
     allowDispatch:current=>permitsRecovery(live(),current),
     definitelyRejected:e=>e instanceof DispatchRejected,
     owner:id=>checked('owner',async()=>{try{if(cli){await client().read(id);return id;}await connect();return await ipc.owner(id);}catch(e){connected=false;ipc.close();throw e;}}),
-    send:(id,owner,messageId)=>checked('dispatch',()=>cli?client().queue(id,messageId):ipc.resume(id,owner,messageId)),compact:(id,owner)=>checked('dispatch',()=>{if(cli)throw new DispatchRejected('CLI uses continue recovery');return ipc.compact(id,owner);})});
+    send:(id,owner,messageId)=>checked('dispatch',()=>cli?client().queue(id,messageId):ipc.resume(id,owner,messageId))});
   const interval=setInterval(()=>{if(!stopped){if(!getSettings)void loadSettings().then(s=>{standaloneSettings=s;}).catch(()=>{});void watcher.tick();}},2000);
   report('自动恢复已启动：监看此任务的网络及压缩故障。');
   void watcher.tick();

@@ -13,11 +13,9 @@ export interface RecoveryRecord {
 }
 export interface RecoveryStore { read(threadId:string):Promise<RecoveryRecord|null>; save(record:RecoveryRecord):Promise<void> }
 export interface WatchdogDependencies {
-  preferContinue?:boolean;
   read(id:string):Promise<TurnState>;
   owner(id:string):Promise<string>;
   send(id:string,owner:string,messageId:string):Promise<void>;
-  compact(id:string,owner:string):Promise<void>;
   store:RecoveryStore;
   now:()=>number;
   report:(message:string,action?:string,attempt?:number,context?:RecoveryContext)=>void;
@@ -91,9 +89,9 @@ export class Watchdog {
       }
     }
     if(current.status==='completed'&&used>0){used=0;if(record){record={...record,attemptsUsed:0};await this.d.store.save(record);}this.d.progress?.({used:0,limit,exhausted:false});}
-    let action=recoveryAction(current);
-    if(action==='compact'&&this.d.preferContinue)action='continue';
-    if(!action||now<this.nextAttempt||!current.turnId)return;
+    if(!recoveryAction(current)||now<this.nextAttempt||!current.turnId)return;
+    // All new recoveries are ordinary turns; Codex owns automatic compaction.
+    const action='continue' as const;
     if(used>=limit){
       const notice=`${current.turnId}:${limit}`;
       if(this.lastLimitNotice!==notice){this.lastLimitNotice=notice;this.report(`自动恢复已达上限：${used}/${limit}。等待手动继续或提高次数上限。`,'exhausted');}
@@ -108,7 +106,6 @@ export class Watchdog {
         await this.d.store.save(record);
       }
       if(now<retryNotBefore)return;
-      action='continue';
     }
     // Ignore historical failures when a newer event exists; reducer already selects the latest turn.
     if(current.endedAt&&now-current.endedAt<5000)return;
@@ -120,8 +117,8 @@ export class Watchdog {
     await this.d.store.save(next); // Durable before dispatch: crash cannot produce a blind duplicate.
     if(this.stopped||used>=this.limit()){await this.d.store.save({...next,phase:'done',attemptsUsed:used});return;}
     try{
-      if(action==='compact')await this.d.compact(this.id,owner);else await this.d.send(this.id,owner,next.messageId);
-      next.phase='sent';this.report(action==='compact'?'已自动请求原任务重新压缩。':'已向原任务自动发送 continue。',action,used+1);
+      await this.d.send(this.id,owner,next.messageId);
+      next.phase='sent';this.report('已向原任务自动发送 continue。',action,used+1);
     }catch(e){next.phase=this.d.definitelyRejected?.(e)?'done':'unknown';if(next.phase==='done')next.attemptsUsed=used;this.report(next.phase==='done'?'请求未被接收，将自动重试。':'提交未得到确定回执，正在核对原任务。',next.phase==='unknown'?'checking':undefined,used+1);throw e;}
     finally{await this.d.store.save(next);this.nextAttempt=now+Math.min(300000,5000*3**this.attempts++);}
   }

@@ -6,22 +6,29 @@ import type { TurnState } from '../src/core/events';
 function harness(initial:TurnState={status:'failed',turnId:'old',error:'stream disconnected before completion: network error',endedAt:1000}){
   let state=initial,record:RecoveryRecord|null=null,now=10000;
   const calls:string[]=[],messages:string[]=[];
-  const d:WatchdogDependencies={read:async()=>state,owner:async()=>{calls.push('owner');return 'exact-owner';},send:async(id,o)=>{assert.equal(id,'task-A');assert.equal(o,'exact-owner');calls.push('continue');},compact:async()=>{calls.push('compact');},now:()=>now,report:m=>messages.push(m),store:{read:async()=>record,save:async r=>{record={...r};}}};
+  const d:WatchdogDependencies={read:async()=>state,owner:async()=>{calls.push('owner');return 'exact-owner';},send:async(id,o)=>{assert.equal(id,'task-A');assert.equal(o,'exact-owner');calls.push('continue');},now:()=>now,report:m=>messages.push(m),store:{read:async()=>record,save:async r=>{record={...r};}}};
   return {d,calls,messages,setState:(v:TurnState)=>state=v,setTime:(v:number)=>now=v,record:()=>record,watch:()=>new Watchdog('task-A',d)};
+}
+function legacyHarness(initial:TurnState){
+ const h=harness(initial);
+ // Fixture represents a compaction already submitted by an older app version.
+ h.calls.push('owner','compact');
+ void h.d.store.save({threadId:'task-A',failedTurnId:initial.turnId!,action:'compact',messageId:'legacy',phase:'sent',at:10000,attemptsUsed:1,context:{episodeId:initial.turnId!,failedTurnId:initial.turnId!,reason:'compaction'}});
+ return h;
 }
 test('terminal network failure automatically continues exactly the selected task',async()=>{const h=harness(),w=h.watch();await w.tick();await w.tick();assert.deepEqual(h.calls,['owner','continue']);assert.equal(h.record()?.phase,'sent');});
 test('in-progress internal retry does not send; terminal cooldown is respected',async()=>{const h=harness({status:'running',turnId:'t'}),w=h.watch();await w.tick();assert.equal(h.calls.length,0);h.setState({status:'failed',turnId:'t',error:'network error',endedAt:9000});await w.tick();assert.equal(h.calls.length,0);h.setTime(16000);await w.tick();assert.ok(h.calls.includes('continue'));});
 test('fresh-state recheck cancels a plan if user resumed meanwhile',async()=>{const h=harness();let reads=0;const orig=h.d.read;h.d.read=async()=>++reads===1?orig('task-A'):{status:'running',turnId:'manual-new'};await h.watch().tick();assert.deepEqual(h.calls,['owner']);});
 test('durable pending receipt prevents duplicate after restart',async()=>{const h=harness();await h.watch().tick();await h.watch().tick();assert.equal(h.calls.filter(x=>x==='continue').length,1);});
 test('uncertain send is reconciled rather than blindly repeated',async()=>{const h=harness();h.d.send=async()=>{h.calls.push('continue');throw new Error('connection lost after write');};const w=h.watch();await w.tick();h.setTime(100000);await w.tick();assert.equal(h.calls.filter(x=>x==='continue').length,1);assert.equal(h.record()?.phase,'unknown');h.setState({status:'running',turnId:'new'});await w.tick();assert.equal(h.record()?.phase,'done');});
-test('compaction automatically precedes continue, after verified compaction completion',async()=>{const h=harness({status:'failed',turnId:'old',error:'context window exceeded',endedAt:1000}),w=h.watch();await w.tick();assert.deepEqual(h.calls,['owner','compact']);h.setState({status:'running',turnId:'compact-turn',isCompaction:true});await w.tick();assert.equal(h.calls.length,2);h.setState({status:'completed',turnId:'compact-turn',isCompaction:true});h.setTime(16000);await w.tick();assert.deepEqual(h.calls,['owner','compact','owner','continue']);});
-test('manual task completion is never mistaken for successful compaction',async()=>{const h=harness({status:'failed',turnId:'old',error:'context window exceeded'}),w=h.watch();await w.tick();h.setState({status:'completed',turnId:'manual-turn'});await w.tick();assert.deepEqual(h.calls,['owner','compact']);});
+test('legacy submitted compaction finishes before continue, without another compaction',async()=>{const h=legacyHarness({status:'failed',turnId:'old',error:'context window exceeded',endedAt:1000}),w=h.watch();await w.tick();assert.deepEqual(h.calls,['owner','compact']);h.setState({status:'running',turnId:'compact-turn',isCompaction:true});await w.tick();assert.equal(h.calls.length,2);h.setState({status:'completed',turnId:'compact-turn',isCompaction:true});h.setTime(16000);await w.tick();assert.deepEqual(h.calls,['owner','compact','owner','continue']);});
+test('manual task completion is never mistaken for successful compaction',async()=>{const h=legacyHarness({status:'failed',turnId:'old',error:'context window exceeded'}),w=h.watch();await w.tick();h.setState({status:'completed',turnId:'manual-turn'});await w.tick();assert.deepEqual(h.calls,['owner','compact']);});
 test('stop during an async owner lookup prevents subsequent sending',async()=>{const h=harness(),w=h.watch();h.d.owner=async()=>{w.stop();return'exact-owner';};await w.tick();assert.ok(!h.calls.includes('continue'));});
 test('parallel timer ticks cannot send duplicates',async()=>{const h=harness(),w=h.watch();await Promise.all([w.tick(),w.tick(),w.tick()]);assert.equal(h.calls.filter(x=>x==='continue').length,1);});
 test('failed recovery turns are retried with backoff',async()=>{const h=harness(),w=h.watch();await w.tick();h.setState({status:'failed',turnId:'next',error:'network error',endedAt:10000});await w.tick();assert.equal(h.calls.filter(x=>x==='continue').length,1);h.setTime(30000);await w.tick();assert.equal(h.calls.filter(x=>x==='continue').length,2);});
 
 test('definite rejection is automatically retried after backoff',async()=>{const h=harness();let fail=true;h.d.definitelyRejected=e=>e==='rejected';h.d.send=async()=>{h.calls.push('continue');if(fail)throw'rejected';};const w=h.watch();await w.tick();assert.equal(h.record()?.phase,'done');fail=false;h.setTime(100000);await w.tick();assert.equal(h.calls.filter(x=>x==='continue').length,2);assert.equal(h.record()?.phase,'sent');});
-test('rejected continue after compaction is also retried automatically',async()=>{const h=harness({status:'failed',turnId:'old',error:'context window exceeded'});h.d.definitelyRejected=e=>e==='rejected';const w=h.watch();await w.tick();h.setState({status:'completed',turnId:'compacted',isCompaction:true});h.setTime(20000);let fail=true;h.d.send=async()=>{h.calls.push('continue');if(fail)throw'rejected';};await w.tick();assert.equal(h.record()?.action,'compact');fail=false;h.setTime(100000);await w.tick();assert.equal(h.calls.filter(x=>x==='continue').length,2);assert.equal(h.record()?.phase,'sent');});
+test('rejected continue after compaction is also retried automatically',async()=>{const h=legacyHarness({status:'failed',turnId:'old',error:'context window exceeded'});h.d.definitelyRejected=e=>e==='rejected';const w=h.watch();await w.tick();h.setState({status:'completed',turnId:'compacted',isCompaction:true});h.setTime(20000);let fail=true;h.d.send=async()=>{h.calls.push('continue');if(fail)throw'rejected';};await w.tick();assert.equal(h.record()?.action,'compact');fail=false;h.setTime(100000);await w.tick();assert.equal(h.calls.filter(x=>x==='continue').length,2);assert.equal(h.record()?.phase,'sent');});
 test('stop while durable receipt is being saved cancels dispatch',async()=>{const h=harness(),w=h.watch(),save=h.d.store.save;h.d.store.save=async r=>{await save(r);if(r.phase==='pending')void w.stop();};await w.tick();assert.ok(!h.calls.includes('continue'));assert.equal(h.record()?.phase,'done');});
 test('live state veto prevents dispatch without creating a recovery receipt',async()=>{const h=harness();h.d.allowDispatch=()=>false;await h.watch().tick();assert.deepEqual(h.calls,['owner']);assert.equal(h.record(),null);});
 test('three attempts survive running acknowledgements and watchdog restarts',async()=>{
@@ -46,7 +53,7 @@ test('successful completion and a later manual turn start fresh failure chains',
   h.setState({status:'running',turnId:'auto-2'});await w.tick();h.setState({status:'failed',turnId:'manual-3',error:'network error'});h.setTime(200000);await w.tick();assert.equal(h.record()?.attemptsUsed,1);assert.equal(h.calls.filter(x=>x==='continue').length,3);
 });
 test('compaction and its follow-up continue consume one recovery attempt',async()=>{
-  const h=harness({status:'failed',turnId:'old',error:'context window exceeded'});h.d.settings=()=>({retryAfterFailure:true,maxAttempts:1,language:'codex'});const w=h.watch();await w.tick();
+  const h=legacyHarness({status:'failed',turnId:'old',error:'context window exceeded'});h.d.settings=()=>({retryAfterFailure:true,maxAttempts:1,language:'codex'});const w=h.watch();await w.tick();
   h.setState({status:'completed',turnId:'compact-1',isCompaction:true});h.setTime(100000);await w.tick();assert.equal(h.record()?.attemptsUsed,1);
   h.setState({status:'failed',turnId:'auto-1',error:'network error'});h.setTime(200000);await w.tick();assert.deepEqual(h.calls,['owner','compact','owner','continue']);
 });
@@ -68,10 +75,10 @@ test('recovery animation receives accepted attempt numbers, with compaction foll
     h.setState({status:'failed',turnId:`retry-${i}`,error:'network error'});
   }
   assert.deepEqual(events,[['failed',1],['continue',1],['failed',2],['continue',2],['failed',3],['continue',3]]);
-  const compact=harness({status:'failed',turnId:'original',error:'context window exceeded'}),reports:Array<[string|undefined,number|undefined]>=[];
+  const compact=legacyHarness({status:'failed',turnId:'original',error:'context window exceeded'}),reports:Array<[string|undefined,number|undefined]>=[];
   compact.d.report=(_m,a,n)=>{if(a)reports.push([a,n]);};
   const cw=compact.watch();await cw.tick();compact.setState({status:'completed',turnId:'compaction',isCompaction:true});compact.setTime(20000);await cw.tick();
-  assert.deepEqual(reports,[['failed',1],['compact',1],['continue',1]]);
+  assert.deepEqual(reports,[['continue',1]]);
 });
 
 
@@ -87,7 +94,7 @@ test('normal running, user stop and completed tasks never get an unconfirmed han
  for(const status of ['running','waiting','completed'] as const){const h=harness();const progress:any[]=[];h.d.progress=p=>progress.push(p);await h.watch().tick();h.setTime(999999);h.setState({status,turnId:'old'});await h.watch().tick();assert.equal(progress.at(-1).unconfirmed,undefined);assert.equal(h.calls.filter(c=>c==='continue').length,1);}
 });
 test('compaction and subsequent continue retain the same incident across restart',async()=>{
- const h=harness({status:'failed',turnId:'origin',error:'context window exceeded'});await h.watch().tick();
+ const h=legacyHarness({status:'failed',turnId:'origin',error:'context window exceeded'});await h.watch().tick();
  const context=h.record()!.context;h.setState({status:'completed',turnId:'compacted',isCompaction:true});h.setTime(20000);await h.watch().tick();assert.deepEqual(h.record()?.context,context);
  h.setState({status:'failed',turnId:'follow-up',error:'network error'});h.setTime(100000);await h.watch().tick();assert.deepEqual(h.record()?.context,context);
 });
@@ -111,34 +118,49 @@ test('capacity failure on disk does not interrupt Codex retries or approval wait
 test('failed standalone compaction cools from failure then continues, sharing the three-attempt cap across restarts',async()=>{
  const error='Error running remote compact task: stream disconnected before completion: network error';
  const h=harness({status:'failed',turnId:'original',error,endedAt:1000});
- await h.watch().tick();assert.equal(h.record()?.action,'compact');
+ await h.watch().tick();assert.equal(h.record()?.action,'continue');
  h.setTime(610000);h.setState({status:'failed',turnId:'compact-1',isCompaction:true,error,endedAt:610000});
  await h.watch().tick();assert.equal(h.record()?.retryNotBefore,640000);
- h.setTime(639999);await h.watch().tick();assert.deepEqual(h.calls,['owner','compact']);
+ h.setTime(639999);await h.watch().tick();assert.deepEqual(h.calls,['owner','continue']);
  h.setTime(640000);await h.watch().tick();assert.equal(h.record()?.action,'continue');assert.equal(h.record()?.attemptsUsed,2);
  h.setState({status:'running',turnId:'auto-2',isCompaction:true});await h.watch().tick();assert.ok(!h.messages.some(m=>m.includes('已确认原任务恢复')));
  h.setTime(1240000);h.setState({status:'failed',turnId:'auto-2',error,endedAt:1240000});await h.watch().tick();
- h.setTime(1299999);await h.watch().tick();assert.equal(h.calls.filter(c=>c==='continue').length,1);
+ h.setTime(1299999);await h.watch().tick();assert.equal(h.calls.filter(c=>c==='continue').length,2);
  h.setTime(1300000);await h.watch().tick();assert.equal(h.record()?.attemptsUsed,3);
  h.setState({status:'failed',turnId:'auto-3',error,endedAt:1400000});h.setTime(2000000);await h.watch().tick();
- assert.deepEqual(h.calls.filter(c=>c!=='owner'),['compact','continue','continue']);assert.ok(h.messages.some(m=>m.includes('3/3')));
+ assert.deepEqual(h.calls.filter(c=>c!=='owner'),['continue','continue','continue']);assert.ok(h.messages.some(m=>m.includes('3/3')));
 });
 test('uncertain compaction never switches to continue without a new-turn receipt',async()=>{
- const h=harness({status:'failed',turnId:'old',error:'context window exceeded'});
- h.d.compact=async()=>{h.calls.push('compact');throw Error('receipt lost');};await h.watch().tick();
+ const h=legacyHarness({status:'failed',turnId:'old',error:'context window exceeded'});
+ await h.d.store.save({...h.record()!,phase:'unknown'});await h.watch().tick();
  h.setTime(1000000);await h.watch().tick();assert.deepEqual(h.calls,['owner','compact']);assert.equal(h.record()?.phase,'unknown');
 });
 test('fallback cooldown without an end timestamp persists and a user restart cancels the fallback',async()=>{
- const h=harness({status:'failed',turnId:'old',error:'context window exceeded'});await h.watch().tick();
+ const h=legacyHarness({status:'failed',turnId:'old',error:'context window exceeded'});await h.watch().tick();
  h.setState({status:'failed',turnId:'compaction',error:'context window exceeded'});h.setTime(600000);await h.watch().tick();assert.equal(h.record()?.retryNotBefore,630000);
  h.setTime(620000);await h.watch().tick();assert.equal(h.record()?.retryNotBefore,630000);
  h.setState({status:'running',turnId:'manual-new'});h.setTime(700000);await h.watch().tick();assert.equal(h.calls.filter(c=>c==='continue').length,0);
 });
 
-test('managed CLI continues compaction failures with capped retries and preserves the cause',async()=>{
+test('all adapters continue compaction failures with capped retries and preserves the cause',async()=>{
  const h=harness({status:'failed',turnId:'old',error:'Error running remote compact task: Connection failed',endedAt:1000});
- h.d.preferContinue=true;h.d.settings=()=>({retryAfterFailure:true,maxAttempts:1,language:'codex'});
+ h.d.settings=()=>({retryAfterFailure:true,maxAttempts:1,language:'codex'});
  const w=h.watch();await w.tick();assert.deepEqual(h.calls,['owner','continue']);assert.equal(h.record()?.context?.reason,'compaction');
  h.setState({status:'failed',turnId:'new',error:'network error',endedAt:10000});h.setTime(100000);await w.tick();
  assert.equal(h.calls.filter(x=>x==='continue').length,1);assert.ok(!h.calls.includes('compact'));
+});
+
+test('fresh compaction and context-limit failures always submit continue with compaction cause',async()=>{
+ for(const failure of [
+  {error:'Error running remote compact task: Connection failed'},
+  {error:'context window exceeded'},
+  {error:'internal error',isCompaction:true},
+  {errorCode:'contextWindowExceeded'},
+ ]){
+  const h=harness({status:'failed',turnId:'original',endedAt:1000,...failure});
+  await h.watch().tick();
+  assert.deepEqual(h.calls,['owner','continue']);
+  assert.equal(h.record()?.action,'continue');assert.equal(h.record()?.context?.reason,'compaction');
+  await h.watch().tick();assert.equal(h.calls.filter(c=>c==='continue').length,1);
+ }
 });
