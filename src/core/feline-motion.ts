@@ -1,12 +1,12 @@
-import {clamp,durationOf,keys,type Performance} from './performance';
+import {ambientGesture,clamp,durationOf,keys,type Performance} from './performance';
 export interface FelineMotion{peek?:import("./feline-peek").FelinePeek;lift?:number;stride:number;paw:number;crouch:number;head:number;tail:number;breathe:number;phase:number;settleAge?:number}
 const smooth=(a:number,b:number,x:number)=>{const t=clamp((x-a)/(b-a));return t*t*(3-2*t);};
 export function felineMotion(mode:Performance,age:number,time:number,gait:number):FelineMotion{
   const t=time/1000,u=clamp(age/durationOf(mode));
   const reach=keys(u,[[0,0],[.22,.15],[.43,1],[.61,.85],[.86,.12],[1,0]]);
-  return {stride:mode==='walk'?1:0,paw:mode==='tap'?reach*.65:mode==='whip'||mode==='heavy'?reach:mode==='working'?.12+.08*Math.sin(t*2.1):0,
+  return {stride:mode==='walk'?1:0,paw:mode==='tap'?reach*.65:mode==='whip'||mode==='heavy'?reach:mode==='working'?ambientGesture(time,6000)*.1:0,
     crouch:mode==='heavy'?reach*.7:mode==='exhausted'?1:mode==='compact'?.2:0,
-    head:mode==='thinking'?-.35:mode==='observe'?.25:mode==='waiting'?-.22:mode==='recovered'?Math.sin(u*Math.PI*2)*.2*Math.sin(u*Math.PI):mode==='tap'||mode==='heavy'?reach*.3:0,
+    head:mode==='working'?ambientGesture(time,6000)*-.16:mode==='thinking'?-.35:mode==='observe'?.25:mode==='waiting'?-.22:mode==='recovered'?Math.sin(u*Math.PI*2)*.2*Math.sin(u*Math.PI):mode==='tap'||mode==='heavy'?reach*.3:0,
     tail:Math.sin(t*1.65)*.65+Math.sin(t*.63)*.2,breathe:Math.sin(t*1.9),phase:gait};
 }
 // Continuous torso deformation; limbs have separate joint-controlled topology.

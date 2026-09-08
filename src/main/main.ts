@@ -1,3 +1,6 @@
+import {companionSummary,codexTaskUrl} from '../core/companion-summary';
+import {UpdateChecker} from './updates';
+import {RELEASES_URL} from '../core/updates';
 import {scanUsage} from './usage-overview';
 import {aggregateUsage} from '../core/usage-overview';
 import {CompletionInbox} from './completion-inbox';
@@ -44,6 +47,19 @@ const demoTasks: Task[] = [
 ];
 let state: OverseerState = { character:'foreman',mode: demo ? 'demo' : 'live', tasks: demo ? demoTasks : [], selectedId: demo ? ids[0] : null,
   location: {kind:'unlocated', reason:'hidden'}, phase:'idle', message: demo ? '演练场：三个任务，两个同名。先找到正确的那一个。' : '读取本机任务，选择任务后启动自动督工。', snapshotAgeMs:null,watchingIds:[],autoAll:!demo,settings:{...defaultSettings},language:'zh',retryProgress:{} };
+const updates=new UpdateChecker({currentVersion:app.getVersion(),platform:process.platform,arch:process.arch,cacheFile:join(smoke?app.getPath('userData'):paths.stateDir,'updates.json'),onChange:update=>{if(quitting)return;state.update=update;publish();void notifyUpdate();}});
+state.update=updates.state;
+let updateTimer:ReturnType<typeof setInterval>,updateStartup:ReturnType<typeof setTimeout>,updateNotifying=false;
+const automaticUpdatesEnabled=()=>state.settings?.checkForUpdates!==false;
+function scheduleUpdates(){clearInterval(updateTimer);clearTimeout(updateStartup);if(demo||state.settings?.checkForUpdates===false)return;updateStartup=setTimeout(()=>void updates.check(),15000);updateTimer=setInterval(()=>void updates.check(),6*3600000);}
+async function notifyUpdate(){
+ if(demo||quitting||updateNotifying||state.settings?.checkForUpdates===false||updates.state.status!=='available'||!updates.state.release||!Notification.isSupported()||panel?.isVisible()&&!panel.isMinimized())return;
+ updateNotifying=true;
+ try{const release=updates.state.release;if(!await updates.claimNotification()||!automaticUpdatesEnabled())return;
+  const n=new Notification({title:state.language==='en'?'Cyber Overseer update available':'赛博督工有新版本',body:state.language==='en'?`Version ${release.version} is ready. View release notes and download when convenient.`:`版本 ${release.version} 已发布，可查看更新说明并下载。`,silent:true});
+  n.on('click',()=>{showSettings();panel.webContents.send('open-settings');});n.show();
+ }catch{/* An update reminder must never interrupt task watching. */}finally{updateNotifying=false;}
+}
 const pricing=new PricingCatalog(join(smoke?app.getPath('userData'):paths.stateDir,'pricing.json'),join(app.getAppPath(),'data','pricing.json'));
 let supply:SupplyState={account:null,task:null,title:null};
 let supplyBusy=false,lastAccountRead=0,lastTaskRead=0;
@@ -56,7 +72,7 @@ async function refreshSupply(){
   const prices=await pricing.load();if(supply.task)supply.task=repriceUsage(supply.task,prices.book,prices.error);if(prices.changed)console.log(JSON.stringify({event:'supply-ready',pricePath:pricing.path,priceModels:Object.keys(prices.book.models).length,quotaWindows:supply.account?.windows.length??0,taskPriced:supply.task?.estimatedUSD!=null,taskId:supply.task?.id}));
  }catch{console.warn('Supply refresh unavailable');}finally{supplyBusy=false;movePet();publish();}
 }
-function currentSupply():SupplyState {return {...supply,watch:watchSummary(state,recoveringTasks),task:supply.task?.id===state.selectedId?supply.task:null,title:state.tasks.find(t=>t.id===state.selectedId)?.title??null};}
+function currentSupply():SupplyState {return {...supply,companion:companionSummary({...state,inbox:inbox.entries}),watch:watchSummary(state,recoveringTasks),task:supply.task?.id===state.selectedId?supply.task:null,title:state.tasks.find(t=>t.id===state.selectedId)?.title??null};}
 let usageBusy=false,lastUsageRead=0;let usageContinueTimer:ReturnType<typeof setTimeout>;
 async function refreshUsageOverview(){
  if(demo||quitting||usageBusy||Date.now()-lastUsageRead<(state.usageOverview?.pending?1000:120000))return;
@@ -127,7 +143,7 @@ async function enableWatch(id:string){
         const before=state.retryProgress?.[id];
         state.retryProgress??={};state.retryProgress[id]=progress;
         if(JSON.stringify(before)!==JSON.stringify(progress)){movePet();publish();}
-      },(kind,failed)=>{state.health??={};state.health.taskErrors??={};const errors=state.health.taskErrors[id]??={};if(failed){errors[kind]??=Date.now();}else delete errors[kind];publish();},turn=>{const task=state.tasks.find(t=>t.id===id);if(task)void inbox.add(task,turn).then(changed=>{state.inboxError=false;if(changed)publish();}).catch(()=>{state.inboxError=true;publish();});});watchers.set(id,stop);
+      },(kind,failed)=>{state.health??={};state.health.taskErrors??={};const errors=state.health.taskErrors[id]??={};if(failed){errors[kind]??=Date.now();}else delete errors[kind];publish();},turn=>{const task=state.tasks.find(t=>t.id===id);if(task)void inbox.add(task,turn).then(changed=>{state.inboxError=false;if(changed){publish();movePet();}}).catch(()=>{state.inboxError=true;publish();});});watchers.set(id,stop);
     state.health??={};state.health.connectionSince??={};state.health.connectionSince[id]=Date.now();
     console.log(JSON.stringify({event:'task-monitored',threadId:id,autoAll:state.autoAll}));
     if(!state.selectedId)state.selectedId=id;
@@ -325,8 +341,11 @@ async function command(name: string, value?: string):Promise<OverseerState> {
       state.watchingIds=[...watchers.keys()];syncStreams();publish();movePet();
     });watchControl=run;await run;return state;
   }
-  if(name==='inbox-read-many'){const ids:unknown=JSON.parse(value??'null');if(!Array.isArray(ids)||ids.length>100||!ids.every(id=>typeof id==='string'))throw Error('Invalid inbox selection');await inbox.markReadMany(ids);state.inboxError=false;publish();
-  }else if(name==='inbox-read'){await inbox.markRead(value??'');state.inboxError=false;publish();
+  if(name==='check-app-update'){if(demo)state.update={currentVersion:app.getVersion(),status:'current',checkedAt:Date.now()};else state.update=await updates.check(true);publish();
+  }else if(name==='open-app-update'){const latest=demo?state.update:updates.state;if(value&&latest?.release?.version!==value)throw Error('Update information changed');if(!demo)await shell.openExternal(latest?.release?.url??RELEASES_URL);
+  }else if(name==='open-codex'){const url=codexTaskUrl({...state,inbox:inbox.entries},value??'');if(!demo)await shell.openExternal(url);
+  }else if(name==='inbox-read-many'){const ids:unknown=JSON.parse(value??'null');if(!Array.isArray(ids)||ids.length>100||!ids.every(id=>typeof id==='string'))throw Error('Invalid inbox selection');await inbox.markReadMany(ids);state.inboxError=false;publish();movePet();
+  }else if(name==='inbox-read'){await inbox.markRead(value??'');state.inboxError=false;publish();movePet();
   }else if(name==='check-recovery'){
     if(!demo&&state.selectedId){const id=state.selectedId,status=await readTaskState(id);state.tasks=state.tasks.map(t=>t.id===id?{...t,...status}:t);state.message=state.language==='en'?'Task state refreshed. Receipts are still checked automatically.':'已重新读取任务状态，恢复回执仍在自动核对。';}
     publish();
@@ -334,7 +353,7 @@ async function command(name: string, value?: string):Promise<OverseerState> {
   }else if(name==='pricing'){await pricing.load();shell.showItemInFolder(pricing.path);
   }else if(name==='settings'){
     const next=parseSettings(JSON.parse(value??'null'));
-    settingsWrite=settingsWrite.catch(()=>{}).then(async()=>{if(!demo)await saveSettings(next);state.settings=next;await refreshLanguage();updateTray();movePet();publish();});
+    settingsWrite=settingsWrite.catch(()=>{}).then(async()=>{if(!demo)await saveSettings(next);const changed=state.settings?.checkForUpdates!==next.checkForUpdates;state.settings=next;if(changed)scheduleUpdates();await refreshLanguage();updateTray();movePet();publish();});
     await settingsWrite;
   }else if(name==='character'){
     if(!isCharacterId(value))throw new Error('Unknown character');
@@ -420,10 +439,18 @@ app.whenReady().then(async()=>{
     }
     movePet();return {x,y,dock:manualPet?.dock};
   });
-  ipcMain.handle('pet-action',async(event,action)=>{
+  ipcMain.handle('pet-action',async(event,action,value)=>{
     const w=[...overlays.values()].find(w=>w.webContents===event.sender);
     if(!w)throw new Error('Unknown overlay');
-    if(action==='settings'){
+    if(value!==undefined&&typeof value!=='string')throw new Error('Invalid pet target');
+    if(action==='open-codex'){
+      await command('open-codex',value);
+    }else if(action==='result'){
+      if(!inbox.entries.some(e=>e.id===value))throw new Error('Unknown result');
+      showSettings();publish();panel.webContents.send('open-inbox',value);
+    }else if(action==='task'){
+      await command('select',value);showSettings();panel.webContents.send('open-task');
+    }else if(action==='settings'){
       const target=watchSummary(state,recoveringTasks).targetId;
       if(target)await command('select',target);
       showSettings();panel.webContents.send('open-task');
@@ -446,6 +473,7 @@ app.whenReady().then(async()=>{
   await tick();publish();
   if(!demo){
     await command('read-tasks');
+    await updates.load();state.update=updates.state;publish();scheduleUpdates();
     void refreshUsageOverview();usageTimer=setInterval(()=>void refreshUsageOverview(),15000);
     void refreshSupply();supplyTimer=setInterval(()=>void refreshSupply(),5000);
     for(const id of new Set(initialWatches)){await command('select',id);await command('auto');}
@@ -460,12 +488,72 @@ app.whenReady().then(async()=>{
   }
   if(smoke) await (process.argv.includes('--interface-only')?interfaceSmoke():smokeTest());
 }).catch(e=>{console.error(e);app.exit(1);});
-app.on('before-quit',()=>{quitting=true;clearInterval(usageTimer);clearTimeout(usageContinueTimer);clearInterval(supplyTimer);clearInterval(pollTimer);clearInterval(discoveryTimer);clearInterval(languageTimer);if(demoActionTimer)clearTimeout(demoActionTimer);for(const stream of streams.values())stream.stop();for(const stop of watchers.values())void stop();});
+app.on('before-quit',()=>{quitting=true;clearInterval(updateTimer);clearTimeout(updateStartup);clearInterval(usageTimer);clearTimeout(usageContinueTimer);clearInterval(supplyTimer);clearInterval(pollTimer);clearInterval(discoveryTimer);clearInterval(languageTimer);if(demoActionTimer)clearTimeout(demoActionTimer);for(const stream of streams.values())stream.stop();for(const stop of watchers.values())void stop();});
 app.on('window-all-closed',()=>{});
 
 async function sampleUsageOverview(){
  const book=(await pricing.load()).book,now=Date.now(),model=Object.keys(book.models)[0];
  state.usageOverview=aggregateUsage({samples:Array.from({length:7},(_,i)=>({at:now-i*86400000,threadId:ids[i%3],project:i%2?'C:/Projects/ModelDial':'/projects/cyber-overseer',model,input:(i+1)*12000,cached:(i+1)*4000,cacheWrite:0,output:(i+1)*2000,contextTokens:16000})),files:3,scanned:3,pending:0,errors:0,excludedForks:1,fetchedAt:now},book,now);
+}
+async function updateSmoke(){
+ const saved={...state},pause=()=>new Promise(r=>setTimeout(r,150)),check=(ok:boolean,message:string)=>{if(!ok)throw Error(message);};
+ for(const [language,width,version] of [['en',840,'9.9.9'],['zh',1120,'9.9.10']] as const){
+  state.language=language;state.update={currentVersion:app.getVersion(),status:'available',checkedAt:Date.now(),release:{version,url:`${RELEASES_URL}/tag/v${version}`,prerelease:true}};panel.setSize(width,680);publish();await pause();
+  check(await panel.webContents.executeJavaScript('!document.getElementById("app-update-banner").hidden'),'new release banner missing');
+  await panel.webContents.executeJavaScript('document.getElementById("show-app-update").click();document.querySelector(".app-updates").scrollIntoView({block:"end"})');await pause();
+  const visible=await panel.webContents.executeJavaScript(`(()=>{const d=document.getElementById('settings-dialog'),r=d.getBoundingClientRect();return {open:d.open,text:document.querySelector('.app-updates').textContent,inside:r.x>=0&&r.y>=0&&r.right<=innerWidth&&r.bottom<=innerHeight,width:d.scrollWidth<=d.clientWidth};})()`);
+  check(visible.open&&visible.inside&&visible.width&&visible.text.includes(version),'update settings overflow or version missing');
+  if(language==='en')check(!/[\u4e00-\u9fff]/.test(visible.text),'update settings English incomplete');
+  await writeFile(join(artifactDir,`app-update-${language}-${width}.png`),(await panel.webContents.capturePage()).toPNG());
+  const selected=state.selectedId;await panel.webContents.executeJavaScript('document.getElementById("download-app-update").click()');await pause();check(state.selectedId===selected,'update download changed the task');
+  state.update={...state.update,status:'error',error:'network'};publish();await pause();
+  check(await panel.webContents.executeJavaScript('!document.getElementById("download-app-update").hidden && !document.getElementById("app-update-status").textContent.includes("最新") && !document.getElementById("app-update-status").textContent.includes("latest")'),'failed check claims current or lost known release');
+  await panel.webContents.executeJavaScript('document.getElementById("check-app-update").click()');await pause();check(state.update?.status==='current','manual update check did not finish');
+  check(await panel.webContents.executeJavaScript('document.getElementById("app-update-banner").hidden && document.getElementById("download-app-update").hidden'),'no-update check left stale download banner');
+  await panel.webContents.executeJavaScript('document.getElementById("auto-update-check").checked=false;document.getElementById("settings-form").requestSubmit()');await pause();check(state.settings?.checkForUpdates===false,'update preference not saved');
+  await panel.webContents.executeJavaScript('document.getElementById("close-settings").click()');
+ }
+ state=saved;publish();console.log(JSON.stringify({ok:true,checks:['bilingual update notice at 840/1120','manual update check','offline preserves last release without claiming current','automatic check preference','download does not touch tasks']}));
+}
+async function companionSmoke(){
+ const check=(ok:boolean,message:string)=>{if(!ok)throw Error(message);},pause=()=>new Promise(r=>setTimeout(r,140));
+ clearInterval(pollTimer);const saved={...state},savedInbox=inbox.entries,savedSupply=supply,savedPlacement=manualPet;
+ const display=screen.getPrimaryDisplay(),pet=overlays.get(display.id)!;
+ state.mode='live';state.health={};state.retryProgress={};state.watchingIds=[ids[0],ids[1]];state.selectedId=ids[0];state.inventoryError=undefined;
+ state.tasks=demoTasks.map((t,i)=>({...t,title:i<2?'窗口定位 · 同名任务':'文档整理',status:'running',error:undefined}));
+ state.liveStates=Object.fromEntries(ids.slice(0,2).map((id,i)=>[id,{threadId:id,connection:'live' as const,work:'running' as const,activity:i?'command' as const:'files' as const,label:i?'执行命令':'修改文件',updatedAt:Date.now()}]));
+ inbox.entries=[{id:'companion-result',threadId:ids[1],turnId:'companion-turn',title:'Saved title',cwd:'/projects/example',at:Date.now()-60000,excerpt:'界面已调整，验证记录已整理。\nThe interface is ready for review.',read:false}];
+ supply={account:{windows:[{id:'codex',name:'Codex',used:25,minutes:10080,resetAt:Date.now()+86400000}],resets:null,fetchedAt:Date.now(),stale:false},task:null,title:null};
+ manualPet={displayId:display.id,x:display.bounds.width-190,y:display.bounds.height-170,threadId:null};placementInstant=true;animation.until=0;
+ for(const language of ['zh','en'] as const){
+  state.language=language;movePet();publish();await pause();
+  await pet.webContents.executeJavaScript(`(()=>{const h=document.getElementById('pet-hit').getBoundingClientRect();document.dispatchEvent(new MouseEvent('mousemove',{clientX:h.x+h.width/2,clientY:h.y+70}));})()`);await new Promise(r=>setTimeout(r,380));
+  const card=await pet.webContents.executeJavaScript(`(()=>{const c=document.getElementById('supply-card'),r=c.getBoundingClientRect();return {hidden:c.hidden,text:c.textContent,tasks:Array.from(c.querySelectorAll('.companion-task')).map(t=>t.dataset.threadId),x:Math.floor(r.x),y:Math.floor(r.y),width:Math.ceil(r.width),height:Math.ceil(r.height)};})()`);
+  check(!card.hidden&&card.tasks[0]===ids[0]&&card.tasks[1]===ids[1],'companion hover lost exact task identities');
+  check(card.text.includes(language==='zh'?'修改文件':'Editing files')||language==='en'&&card.text.includes('Changing files'),'live activity missing from hover: '+card.text);
+  check(!inbox.entries[0].read,'hover marked a result read');
+  check(card.x>=0&&card.y>=0&&card.x+card.width<=display.bounds.width&&card.y+card.height<=display.bounds.height,'companion card outside display');
+  await writeFile(join(artifactDir,`companion-hover-${language}.png`),(await pet.webContents.capturePage({x:card.x,y:card.y,width:card.width,height:card.height})).toPNG());
+ }
+ await pet.webContents.executeJavaScript(`window.pressedTask=document.querySelector('.companion-task button');window.pressedTask.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));`);
+ state.liveStates[ids[0]].activity='command';state.liveStates[ids[0]].label='执行命令';movePet();await pause();
+ check(await pet.webContents.executeJavaScript('window.pressedTask.isConnected'),'live refresh removed a pressed task button');
+ await pet.webContents.executeJavaScript(`document.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));`);await pause();
+ await pet.webContents.executeJavaScript(`document.getElementById('pet-result').click()`);await pause();
+ check(inbox.entries[0].read,'result handoff did not mark displayed entry read');
+ check(await panel.webContents.executeJavaScript('document.getElementById("inbox-dialog").open && document.querySelector("details[data-id=companion-result]").open'),'result handoff opened wrong entry');
+ check(await pet.webContents.executeJavaScript('document.getElementById("pet-result").hidden'),'read result badge did not clear');
+ await pet.webContents.executeJavaScript(`window.overseer.petAction('task',${JSON.stringify(ids[1])})`);check(state.selectedId===ids[1],'task card selected wrong duplicate title');
+ let rejected=false;try{await pet.webContents.executeJavaScript(`window.overseer.petAction('open-codex','unknown')`);}catch{rejected=true;}check(rejected,'native navigation accepted unknown task');
+ // Use a known model plus a missing internal rate; never contact a model in smoke.
+ const book=(await pricing.load()).book,now=Date.now(),model=Object.keys(book.models)[0];
+ state.usageOverview=aggregateUsage({samples:[model,'codex-auto-review'].map(model=>({at:now,threadId:ids[0],project:'/projects/example',model,input:1000000,cached:0,cacheWrite:0,output:1000,contextTokens:1000000})),files:1,scanned:1,pending:0,errors:0,excludedForks:0,fetchedAt:now},book,now);publish();
+ panel.show();await panel.webContents.executeJavaScript('document.getElementById("nav-overview").click();document.querySelector("[data-period=today]").click();document.getElementById("overview").scrollTop=0');await pause();
+ check(await panel.webContents.executeJavaScript('document.querySelector(".usage-total").textContent.includes("$") && document.querySelector(".usage-pricing-reason").textContent.includes("codex-auto-review")'),'missing rate hid known spend');
+ await writeFile(join(artifactDir,'partial-pricing-en.png'),(await panel.webContents.capturePage()).toPNG());
+ state.language='zh';publish();await pause();await writeFile(join(artifactDir,'partial-pricing-zh.png'),(await panel.webContents.capturePage()).toPNG());
+ state=saved;inbox.entries=savedInbox;supply=savedSupply;manualPet=savedPlacement;publish();movePet();
+ console.log(JSON.stringify({ok:true,checks:['daily activity hover in both languages','exact duplicate-title task selection','read only after opening exact result','unread badge clears immediately','pressed button survives stream update','known spend preserved with missing internal rate','native navigation validates identity without sending a turn']}));
 }
 async function smokeTest() {
   await panel.webContents.executeJavaScript('document.getElementById("nav-tasks").click()');
@@ -816,7 +904,7 @@ movePet();pollTimer=setInterval(()=>void tick(),1000);
   assert(await panel.webContents.executeJavaScript('document.getElementById("recovery-handoff").hidden && document.getElementById("watch-health-alert").hidden'),'paused tasks kept handoff or task-health alerts');
   Object.assign(state,savedHandoff);publish();
   console.log(JSON.stringify({ok:true,checks:['overview metrics quota and exact task navigation','completion inbox read state and bilingual dialog','search keyboard navigation and explicit clear','title/project/full-ID search','attention and watching filters','empty result and return to selected task','filters never change watch scope','unconfirmed handoff and read-only check','incident history groups by failure','adapter health warning and pause suppression','bilingual handoff at minimum width','isolated smoke profile','duplicate-title identity','hidden target release','standby window visible','standby character pixels','forward travel and turn before move','hold to lift and drag','drop settles without opening settings','manual placement survives polling','character hover','continuous equipment at 85/12/3 percent','stationary cat food dock','limiting window label','four supply themes and quota hover','pinned supply card','transparent click-through','click opens settings','context menu','visible target binding','dashboard render','whip animation dispatch','four character selections','12 character action previews','56 character performances','three anatomical companion rigs','scrubbable motion studio','preview isolation','character workshop render','six live state/activity transitions','retry settings defaults and edits','Chinese and English settings','English interface coverage','localized native menu and character'],screenshots:dir}));
-  quitting=true;app.quit();
+  await companionSmoke();await updateSmoke();quitting=true;app.quit();
 }
 
 async function interfaceSmoke(){
@@ -929,5 +1017,6 @@ async function interfaceSmoke(){
 
   }
  }
+ await companionSmoke();await updateSmoke();
  console.log(JSON.stringify({ok:true,checks:['four characters dragged from both edges','zero stale pixels after diagonal drag and drop','docked placement persistence','840 and 1120 desktop widths','Chinese and English daily layout','long task titles','independent list scrolling','recovery action visible']}));quitting=true;clearInterval(pollTimer);app.exit(0);
 }

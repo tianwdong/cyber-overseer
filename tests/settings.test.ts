@@ -26,3 +26,9 @@ test('English translations interpolate retry limits and preserve user content',(
   assert.equal(tr('自动恢复已达上限：3/3。等待手动继续或提高次数上限。','en'),'Recovery limit reached: 3/3. Continue manually or raise the limit.');
   assert.equal(tr('共监看 {0} 个任务','en',4),'Watching 4 tasks');assert.equal(tr('用户自己的任务标题','en'),'用户自己的任务标题');
 });
+
+test('update checks default on for older settings and can be disabled without changing recovery',()=>{
+ const old=parseSettings({...defaultSettings});assert.notEqual(old.checkForUpdates,false);
+ const next=parseSettings({...old,checkForUpdates:false});assert.equal(next.checkForUpdates,false);assert.equal(next.maxAttempts,old.maxAttempts);
+ assert.throws(()=>parseSettings({...old,checkForUpdates:'yes'}));
+});

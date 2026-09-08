@@ -107,3 +107,30 @@ test('model capacity failures continue the exact task with cooldown, backoff and
 test('capacity failure on disk does not interrupt Codex retries or approval waits',async()=>{
  for(const work of ['running','retrying','waiting'] as const){const h=harness({status:'failed',turnId:'capacity',error:'Selected model is at capacity. Please try a different model.'});h.d.allowDispatch=current=>permitsRecovery({threadId:'task-A',turnId:'capacity',connection:'live',work,activity:'none',label:'',updatedAt:0},current);await h.watch().tick();assert.equal(h.calls.filter(c=>c==='continue').length,0);assert.equal(h.record(),null);}
 });
+
+test('failed standalone compaction cools from failure then continues, sharing the three-attempt cap across restarts',async()=>{
+ const error='Error running remote compact task: stream disconnected before completion: network error';
+ const h=harness({status:'failed',turnId:'original',error,endedAt:1000});
+ await h.watch().tick();assert.equal(h.record()?.action,'compact');
+ h.setTime(610000);h.setState({status:'failed',turnId:'compact-1',isCompaction:true,error,endedAt:610000});
+ await h.watch().tick();assert.equal(h.record()?.retryNotBefore,640000);
+ h.setTime(639999);await h.watch().tick();assert.deepEqual(h.calls,['owner','compact']);
+ h.setTime(640000);await h.watch().tick();assert.equal(h.record()?.action,'continue');assert.equal(h.record()?.attemptsUsed,2);
+ h.setState({status:'running',turnId:'auto-2',isCompaction:true});await h.watch().tick();assert.ok(!h.messages.some(m=>m.includes('已确认原任务恢复')));
+ h.setTime(1240000);h.setState({status:'failed',turnId:'auto-2',error,endedAt:1240000});await h.watch().tick();
+ h.setTime(1299999);await h.watch().tick();assert.equal(h.calls.filter(c=>c==='continue').length,1);
+ h.setTime(1300000);await h.watch().tick();assert.equal(h.record()?.attemptsUsed,3);
+ h.setState({status:'failed',turnId:'auto-3',error,endedAt:1400000});h.setTime(2000000);await h.watch().tick();
+ assert.deepEqual(h.calls.filter(c=>c!=='owner'),['compact','continue','continue']);assert.ok(h.messages.some(m=>m.includes('3/3')));
+});
+test('uncertain compaction never switches to continue without a new-turn receipt',async()=>{
+ const h=harness({status:'failed',turnId:'old',error:'context window exceeded'});
+ h.d.compact=async()=>{h.calls.push('compact');throw Error('receipt lost');};await h.watch().tick();
+ h.setTime(1000000);await h.watch().tick();assert.deepEqual(h.calls,['owner','compact']);assert.equal(h.record()?.phase,'unknown');
+});
+test('fallback cooldown without an end timestamp persists and a user restart cancels the fallback',async()=>{
+ const h=harness({status:'failed',turnId:'old',error:'context window exceeded'});await h.watch().tick();
+ h.setState({status:'failed',turnId:'compaction',error:'context window exceeded'});h.setTime(600000);await h.watch().tick();assert.equal(h.record()?.retryNotBefore,630000);
+ h.setTime(620000);await h.watch().tick();assert.equal(h.record()?.retryNotBefore,630000);
+ h.setState({status:'running',turnId:'manual-new'});h.setTime(700000);await h.watch().tick();assert.equal(h.calls.filter(c=>c==='continue').length,0);
+});

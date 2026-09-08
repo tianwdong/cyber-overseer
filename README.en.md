@@ -52,6 +52,8 @@ To explore the companions and dashboard first, run `npm run dev`. The demo uses 
 
 Automatic monitoring is enabled on first launch. Click the companion to open settings and adjust retries or language. The language follows Codex by default. Closing the dashboard leaves the overseer running in the system tray; use the tray menu to quit.
 
+The source version includes **app update reminders**. It checks about every six hours and matches installers to your OS and architecture. Check manually or disable automatic checks in Settings. Read the release notes and install when convenient; checking does not interrupt your tasks. [Update behavior and privacy](docs/app-updates.md)
+
 
 ## Rest while your plan keeps moving
 

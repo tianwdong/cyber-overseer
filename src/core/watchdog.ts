@@ -8,6 +8,7 @@ export interface RecoveryRecord {
   context?:RecoveryContext;
   threadId:string; failedTurnId:string; action:'continue'|'compact'; messageId:string;
   attemptsUsed?:number; recoveryTurnId?:string;
+  retryNotBefore?:number; compactionFallback?:boolean;
   phase:'pending'|'sent'|'unknown'|'recovering'|'done'; at:number;
 }
 export interface RecoveryStore { read(threadId:string):Promise<RecoveryRecord|null>; save(record:RecoveryRecord):Promise<void> }
@@ -55,6 +56,8 @@ export class Watchdog {
     if(record&&record.phase!=='done'){
       // We never replay an uncertain submission. A new turn is the read-back receipt.
       if(current.turnId&&current.turnId!==record.failedTurnId){
+        // A continue may still be doing pre-turn compaction, not productive work.
+        if(current.status==='running'&&current.isCompaction){this.report('压缩正在执行，等待结果。');return;}
         if(record.action==='compact'){
           if(current.status==='running'){this.report('压缩正在执行，等待结果。');return;}
           if(current.status==='completed'&&current.isCompaction){
@@ -87,12 +90,23 @@ export class Watchdog {
       }
     }
     if(current.status==='completed'&&used>0){used=0;if(record){record={...record,attemptsUsed:0};await this.d.store.save(record);}this.d.progress?.({used:0,limit,exhausted:false});}
-    const action=recoveryAction(current);
+    let action=recoveryAction(current);
     if(!action||now<this.nextAttempt||!current.turnId)return;
     if(used>=limit){
       const notice=`${current.turnId}:${limit}`;
       if(this.lastLimitNotice!==notice){this.lastLimitNotice=notice;this.report(`自动恢复已达上限：${used}/${limit}。等待手动继续或提高次数上限。`,'exhausted');}
       return;
+    }
+    if(record&&used>0&&(record.action==='compact'||record.compactionFallback||this.context?.reason==='compaction')){
+      // Once a confirmed compaction recovery fails, let a normal turn run its
+      // own automatic compaction. Persist cooldown from failure, not dispatch.
+      const retryNotBefore=record.retryNotBefore??((current.endedAt??now)+Math.min(300000,30000*2**(used-1)));
+      if(record.retryNotBefore===undefined){
+        record={...record,retryNotBefore,compactionFallback:true};
+        await this.d.store.save(record);
+      }
+      if(now<retryNotBefore)return;
+      action='continue';
     }
     // Ignore historical failures when a newer event exists; reducer already selects the latest turn.
     if(current.endedAt&&now-current.endedAt<5000)return;
@@ -100,7 +114,7 @@ export class Watchdog {
     if(this.stopped||used>=this.limit()||this.d.allowDispatch?.(fresh)===false||fresh.turnId!==current.turnId||fresh.status!=='failed')return;
     if(!record||used===0)this.context={episodeId:current.turnId,failedTurnId:current.turnId,reason:action==='compact'?'compaction':isModelAtCapacity(current.error??'')?'capacity':'network'};
     this.report('检测到可恢复的任务故障。','failed',used+1);
-    const next:RecoveryRecord={context:this.context,threadId:this.id,failedTurnId:current.turnId,action,messageId:randomUUID(),phase:'pending',at:now,attemptsUsed:used+1};
+    const next:RecoveryRecord={context:this.context,threadId:this.id,failedTurnId:current.turnId,action,messageId:randomUUID(),phase:'pending',at:now,attemptsUsed:used+1,compactionFallback:used>0&&record?.compactionFallback};
     await this.d.store.save(next); // Durable before dispatch: crash cannot produce a blind duplicate.
     if(this.stopped||used>=this.limit()){await this.d.store.save({...next,phase:'done',attemptsUsed:used});return;}
     try{

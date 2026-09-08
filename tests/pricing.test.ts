@@ -15,6 +15,20 @@ test('prices are data; token categories and long-context thresholds have distinc
  assert.equal(priceUsage([{...sample,model:'new-model'}],book()).usd,null);
  assert.equal(priceUsage([sample,{...sample,model:'new-model'}],book()).usd,null);
 });
+test('partial pricing preserves known event costs while the complete total stays unavailable',()=>{
+ const unknown={...sample,model:'codex-auto-review',cacheWrite:100};
+ assert.deepEqual(priceUsage([sample,unknown,sample],book()),{usd:null,unpriced:['codex-auto-review'],pricedUSD:.0034,pricedCalls:2,unpricedCalls:1,unpricedTokens:410});
+ assert.deepEqual(priceUsage([unknown,unknown],book()),{usd:null,unpriced:['codex-auto-review'],pricedUSD:0,pricedCalls:0,unpricedCalls:2,unpricedTokens:820});
+ assert.deepEqual(priceUsage([],book()),{usd:null,unpriced:[],pricedUSD:0,pricedCalls:0,unpricedCalls:0,unpricedTokens:0});
+ const free=book();free.models.test={input:0,cached:0,output:0,cacheWrite:0,source:'https://example.com'};
+ assert.deepEqual(priceUsage([sample],free),{usd:0,unpriced:[],pricedUSD:0,pricedCalls:1,unpricedCalls:0,unpricedTokens:0});
+});
+test('a model with missing cache-write rates retains its separately priced events',()=>{
+ const partial=book();delete partial.models.test.cacheWrite;
+ assert.deepEqual(priceUsage([sample,{...sample,cacheWrite:100},sample],partial),{usd:null,unpriced:['test'],pricedUSD:.0034,pricedCalls:2,unpricedCalls:1,unpricedTokens:410});
+ const longContextPartial=book();delete longContextPartial.models.test.longContext!.cacheWrite;
+ assert.deepEqual(priceUsage([{...sample,cacheWrite:100},{...sample,cacheWrite:100,contextTokens:272001}],longContextPartial),{usd:null,unpriced:['test'],pricedUSD:.00295,pricedCalls:1,unpricedCalls:1,unpricedTokens:410});
+});
 test('invalid price table cannot make usage free or negative',()=>{
  for(const x of [-1,null,'10',Infinity]){const b=book();b.models.test.input=x as number;assert.throws(()=>parsePriceBook(b));}
  const b=book();b.unit='per_token' as any;assert.throws(()=>parsePriceBook(b));

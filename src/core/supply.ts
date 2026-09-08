@@ -1,7 +1,7 @@
 export interface SupplyWindow {id:string;name:string;used:number;minutes:number;resetAt:number|null}
 export interface AccountSupply {windows:SupplyWindow[];resets:number|null;fetchedAt:number;stale:boolean;plan?:string;accountId?:string}
 export interface TaskUsage {id:string;model:string|null;tokens:number|null;cached:number|null;fetchedAt:number;estimatedUSD:number|null;priceUpdatedAt?:string;priceError?:boolean;unpriced?:string[]}
-export interface SupplyState {watch?:import("./attention").WatchSummary;account:AccountSupply|null;task:TaskUsage|null;title:string|null}
+export interface SupplyState {companion?:import('./companion-summary').CompanionSummary;watch?:import("./attention").WatchSummary;account:AccountSupply|null;task:TaskUsage|null;title:string|null}
 const number=(v:unknown):v is number=>typeof v==='number'&&Number.isFinite(v)&&v>=0;
 export function decodeSupply(raw:any,now=Date.now()):AccountSupply {
  const buckets=raw?.rateLimitsByLimitId??(raw?.rateLimits?{codex:raw.rateLimits}:{}),windows:SupplyWindow[]=[];

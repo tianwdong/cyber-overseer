@@ -23,10 +23,20 @@ let mode:Performance='idle',modeAt=0,previousPose:Pose|undefined,gait=0,speed=0;
 let affectionAt=-10000,strokeDirection=0,strokeTurns=0,strokeAt=0,strokeDistance=0;
 let pointer:{x:number;y:number}|null=null,overPet=false;
 const card=document.getElementById('supply-card')!,content=document.getElementById('supply-content')!,pin=document.getElementById('supply-pin')!;
+const resultButton=document.getElementById('pet-result') as HTMLButtonElement;
+let cardPress=false,pressedResult:string|undefined;
+card.addEventListener('pointerdown',()=>{cardPress=true;});
+const releaseCard=()=>{if(cardPress){cardPress=false;paintCard();}};
+document.addEventListener('pointerup',()=>setTimeout(()=>{releaseCard();pressedResult=undefined;},0));document.addEventListener('pointercancel',releaseCard);window.addEventListener('blur',releaseCard);
+resultButton.addEventListener('pointerdown',()=>{pressedResult=supply.companion?.result?.id;});resultButton.addEventListener('pointercancel',()=>{pressedResult=undefined;});
+async function openCompanion(action:'task'|'result'|'open-codex',value:string){try{await window.overseer.petAction(action,value);}catch{showCard();let error=document.getElementById('companion-error');if(!error){error=document.createElement('p');error.id='companion-error';error.className='supply-warning';content.append(error);}error.textContent=language==='en'?'Unable to open. Please try again.':'暂时无法打开，请重试。';}}
+resultButton.onclick=()=>{const id=pressedResult??supply.companion?.result?.id;pressedResult=undefined;if(id)void openCompanion('result',id);};
+content.addEventListener('click',e=>{const button=(e.target as HTMLElement).closest<HTMLButtonElement>('button[data-pet-action]');if(button?.dataset.value)void openCompanion(button.dataset.petAction as 'task'|'result'|'open-codex',button.dataset.value);});
+function positionResult(){const c=supply.companion;resultButton.hidden=dragging||lift>.05||!c?.result;if(resultButton.hidden)return;resultButton.textContent=language==='en'?`${c!.unread} new result${c!.unread===1?'':'s'}`:`${c!.unread} 条新结果`;resultButton.setAttribute('aria-label',(language==='en'?'Review result: ':'查看结果：')+c!.result!.title);resultButton.style.left=`${Math.max(8,Math.min(innerWidth-resultButton.offsetWidth-8,dock==='left'?8:dock==='right'?innerWidth-resultButton.offsetWidth-8:x-resultButton.offsetWidth/2))}px`;resultButton.style.top=`${Math.max(8,Math.min(innerHeight-resultButton.offsetHeight-8,y+(dock?88:84)))}px`;}
 const supplyTransition=new SupplyTransition();let supplySway=0;let bowl:{x:number;y:number}|null=null;
 let supply:SupplyState={account:null,task:null,title:null},pinned=false,hoverTimer:ReturnType<typeof setTimeout>|undefined;
 let cardSignature='';
-function paintCard(){const signature=JSON.stringify([supply,character,language,Math.floor(Date.now()/60000)]);if(signature!==cardSignature){const scroll=card.scrollTop;renderSupplyCard(content,supply,character,language);card.scrollTop=scroll;cardSignature=signature;}pin.textContent=pinned?(language==='en'?'Unpin':'取消固定'):(language==='en'?'Pin card':'固定卡片');document.getElementById('supply-settings')!.textContent=language==='en'?(supply.watch?.attention?'Review tasks':'Tasks'):(supply.watch?.attention?'查看待处理任务':'查看任务');}
+function paintCard(){if(cardPress)return;const signature=JSON.stringify([supply,character,language,Math.floor(Date.now()/60000)],(key,value)=>key==='updatedAt'||key==='revision'?undefined:value);if(signature!==cardSignature){const scroll=card.scrollTop,focused=content.contains(document.activeElement)?(document.activeElement as HTMLElement).dataset.value:undefined;renderSupplyCard(content,supply,character,language);if(focused)Array.from(content.querySelectorAll<HTMLButtonElement>('button')).find(b=>b.dataset.value===focused)?.focus({preventScroll:true});card.scrollTop=scroll;cardSignature=signature;}pin.textContent=pinned?(language==='en'?'Unpin':'取消固定'):(language==='en'?'Pin card':'固定卡片');document.getElementById('supply-settings')!.textContent=language==='en'?'All tasks':'全部任务';}
 function positionCard(){const preferred=dock==='left'?72:dock==='right'?innerWidth-410:x-310;const left=Math.max(12,Math.min(innerWidth-354,preferred)),top=Math.max(12,Math.min(innerHeight-card.offsetHeight-12,y-card.offsetHeight-115));card.style.left=`${left}px`;card.style.top=`${top}px`;}
 function showCard(){paintCard();card.hidden=false;positionCard();}
 pin.addEventListener('click',()=>{pinned=!pinned;paintCard();});
@@ -35,7 +45,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){void finishDrag(tru
 function updatePointer(){
  const overBody=dock&&!dragging?!!pointer&&pointer.x>=(dock==='left'?0:innerWidth-56)&&pointer.x<=(dock==='left'?56:innerWidth)&&(pointer.y>=y-55&&pointer.y<=y+85):!!pointer&&pointer.x>=x-(character==='mechanic'?90:56)&&pointer.x<=x+(character==='mechanic'?80:56)&&pointer.y>=y-100&&pointer.y<=y+60;
  const rect=card.getBoundingClientRect(),overCard=!card.hidden&&!!pointer&&pointer.x>=rect.left-16&&pointer.x<=rect.right+16&&pointer.y>=rect.top-16&&pointer.y<=rect.bottom+16;
- const over=held||dragging||overBody||overCard;
+ const resultRect=resultButton.getBoundingClientRect(),overResult=!resultButton.hidden&&!!pointer&&pointer.x>=resultRect.left-4&&pointer.x<=resultRect.right+4&&pointer.y>=resultRect.top-4&&pointer.y<=resultRect.bottom+4;
+ const over=held||dragging||overBody||overCard||overResult;
  if(!held&&!dragging&&overBody&&card.hidden&&!hoverTimer)hoverTimer=setTimeout(()=>{hoverTimer=undefined;if(overPet)showCard();},300);
  if(!over){if(hoverTimer){clearTimeout(hoverTimer);hoverTimer=undefined;}if(!pinned)card.hidden=true;}
  if(over!==overPet){overPet=over;window.overseer.petPointer(over);}
@@ -86,7 +97,7 @@ function loop(now:number){
     hit.style.width='56px';hit.style.height='140px';hit.style.transform=`translate(${right?innerWidth-56:0}px,${y-50}px)`;
     hit.dataset.docked=dock;hit.dataset.caption='';hit.dataset.dragging='false';hit.dataset.lift='0';
     hit.setAttribute('aria-label',language==='en'?'Drag out from screen edge':'从屏幕边缘拖出');
-    updatePointer();frame=requestAnimationFrame(loop);return;
+    positionResult();updatePointer();frame=requestAnimationFrame(loop);return;
   }
   hit.dataset.docked='';hit.style.height='142px';
   const dx=tx-x,dy=ty-y,distance=Math.hypot(dx,dy),moving=!dragging&&distance>1,c=getCharacter(character);
@@ -126,7 +137,7 @@ function loop(now:number){
   if(bubble){ctx.fillStyle='#20282ef2';ctx.beginPath();ctx.roundRect(bubbleX-width/2,-108,width,24,6);ctx.fill();ctx.strokeStyle=c.color;ctx.lineWidth=.7;ctx.stroke();ctx.fillStyle='#e9dfcc';ctx.fillText(bubble,bubbleX,-92);}
   const quotaText=supplyVisual.actual===null?(language==='en'?'Quota unavailable':'还没读到额度'):`${windowLabel(supplyVisual.window,language==='en')} · ${supplyVisual.actual===null?'—':Math.round(supplyVisual.actual)+'%'}${supplyVisual.stale?(language==='en'?' · last seen':' · 上次记录'):''}`;
   hit.dataset.supplyLabel=quotaText;ctx.font='10px -apple-system, sans-serif';const qw=ctx.measureText(quotaText).width+16,qx=Math.max(-x+qw/2+8,Math.min(innerWidth-x-qw/2-8,0));ctx.fillStyle='#162128ed';ctx.beginPath();ctx.roundRect(qx-qw/2,58,qw,20,5);ctx.fill();ctx.fillStyle=supplyVisual.stale?'#a2b1b9':supplyVisual.actual!==null&&supplyVisual.actual<20?'#dfba83':'#b8c9be';ctx.fillText(quotaText,qx,72);ctx.restore();
-  const halfWidth=character==='mechanic'?80:56;hit.style.width=`${halfWidth*2}px`;hit.style.transform=`translate(${x-halfWidth}px,${y-100}px)`;hit.setAttribute('aria-label',`${tr(c.name,language)}, ${tr(live?.label??'待命',language)}, ${tr('打开督工设置与任务',language)}`);updatePointer();
+  positionResult();const halfWidth=character==='mechanic'?80:56;hit.style.width=`${halfWidth*2}px`;hit.style.transform=`translate(${x-halfWidth}px,${y-100}px)`;hit.setAttribute('aria-label',`${tr(c.name,language)}, ${tr(live?.label??'待命',language)}, ${tr('打开督工设置与任务',language)}`);updatePointer();
   active=true;frame=requestAnimationFrame(loop);
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(frame);active=false;pointer=null;updatePointer();}});

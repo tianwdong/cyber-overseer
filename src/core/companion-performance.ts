@@ -1,5 +1,5 @@
 import type {CharacterId} from './characters';
-import {clamp,durationOf,keys,foremanPose,performances,type Performance,type Pose} from './performance';
+import {ambientGesture,clamp,durationOf,keys,foremanPose,performances,type Performance,type Pose} from './performance';
 const labels:Record<Exclude<CharacterId,'foreman'>,Partial<Record<Performance,string>>>={
   medic:{idle:'值班观察',walk:'移动就位',thinking:'诊断中',working:'检查心电',retrying:'等待内部重连',alert:'发现异常',tap:'首次 · 状态诊断',whip:'二次 · 电极充能',heavy:'三次 · 辅助启动',compact:'整理记录',observe:'复查运行状态',recovered:'确认恢复',waiting:'提交诊断单',exhausted:'等待人工处理'},
   mechanic:{idle:'巡检待命',walk:'赶往工位',thinking:'考虑修复方案',working:'检修中',retrying:'暂缓动手',alert:'察觉故障',tap:'首次 · 探爪轻触',whip:'二次 · 扒动线缆',heavy:'三次 · 伏身检修',compact:'整理记忆线缆',observe:'检查修复结果',recovered:'验收后收工',waiting:'抬头等待',exhausted:'伏下待命'},
@@ -14,7 +14,7 @@ export function characterPose(id:CharacterId,mode:Performance,age:number,time:nu
   const charge=keys(u,[[0,0],[.24,.3],[.38,.5],[.46,1],[.55,.85],[.82,0],[1,0]]);
   if(mode==='walk'){p.lean=id==='ranger'?.18:.09;p.bob=id==='mechanic'?-Math.abs(Math.sin(gait))*4:-Math.abs(Math.sin(gait))*1.2;p.head=-p.lean*.6;p.leftY=16+Math.sin(gait)*4;p.rightY=16-Math.sin(gait)*4;}
   if(mode==='thinking'){p.head=id==='medic'?-.18:.14;p.rightX=17;p.rightY=-23;p.gaze=-2;p.leftX=-23;}
-  if(mode==='working'){p.head=.1;p.gaze=2;p.leftX=-14;p.leftY=5;p.rightX=19+Math.sin(t*4)*3;p.rightY=4+Math.cos(t*4)*3;}
+  if(mode==='working'){const gesture=ambientGesture(time,id==='medic'?4000:8000);p.head=.07+gesture*.03;p.gaze=2;p.leftX=-14;p.leftY=5;p.rightX=19+Math.sin(t*2)*2*gesture;p.rightY=4+Math.cos(t*2)*2*gesture;}
   if(mode==='retrying'){const lower=keys(u,[[0,0],[.3,1],[.7,1],[1,0]]);p.leftX=-16;p.rightX=16;p.leftY=p.rightY=12+lower*6;p.head=-.07;p.lid=.1;}
   if(mode==='alert'){const jump=keys(u,[[0,0],[.1,1],[.22,0],[1,0]]);p.bob-=jump*3;p.head=-.12;p.gaze=3;}
   if(mode==='tap'){

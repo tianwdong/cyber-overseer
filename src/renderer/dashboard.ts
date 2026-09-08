@@ -1,4 +1,5 @@
 import {renderOverview,showDashboardPage} from './overview';
+import {renderAppUpdates} from './app-updates';
 import {renderInbox} from './inbox-view';
 import {renderDuty} from './duty-view';
 import {watchHealth,healthLabel} from '../core/watch-health';
@@ -13,7 +14,7 @@ const names:Record<Task['status'],string>={unknown:'状态未读取',running:'�
 let selected:string|null=null,lastRows='',query='',filter='all';
 let latestState:OverseerState|undefined;
 function render(s:OverseerState) {
-  renderInbox(s);renderOverview(s);latestState=s;selected=s.selectedId;const lang=s.language??'zh';translateStatic(lang);updateSettings(s);updateWorkshop(s.character,lang);
+  renderInbox(s);renderOverview(s);latestState=s;selected=s.selectedId;const lang=s.language??'zh';translateStatic(lang);updateSettings(s);renderAppUpdates(s);updateWorkshop(s.character,lang);
   document.body.classList.toggle('live-dashboard',s.mode==='live');
   const summary=watchSummary(s),issues=watchHealth(s);
   el('watch-health-alert').hidden=!issues.length||s.mode==='demo';
@@ -129,4 +130,6 @@ el('inbox-dialog').addEventListener('inbox-open-task',async event=>{
 });
 
 el('overview').addEventListener('overview-task',async event=>{try{const next=await window.overseer.command('select',(event as CustomEvent<string>).detail);resetTaskFilters();render(next);showDashboardPage('tasks');document.querySelector('.target-area')!.scrollTop=0;}catch{el('message').textContent=document.documentElement.lang==='en'?'Unable to open this task.':'暂时无法打开此任务。';}});
-el('overview').addEventListener('overview-inbox',event=>{(el('inbox-dialog') as HTMLDialogElement).showModal();const id=(event as CustomEvent<string>).detail;if(id){const card=Array.from(el('inbox-list').querySelectorAll<HTMLDetailsElement>('details')).find(d=>d.dataset.id===id);if(card){card.open=true;card.scrollIntoView({block:'nearest'});}}});
+function openInbox(id?:string){document.querySelectorAll<HTMLDialogElement>('dialog[open]').forEach(d=>d.close());(el('inbox-dialog') as HTMLDialogElement).showModal();if(id){const card=Array.from(el('inbox-list').querySelectorAll<HTMLDetailsElement>('details')).find(d=>d.dataset.id===id);if(card){card.open=true;card.scrollIntoView({block:'nearest'});}}}
+window.overseer.onInbox(openInbox);
+el('overview').addEventListener('overview-inbox',event=>openInbox((event as CustomEvent<string>).detail));

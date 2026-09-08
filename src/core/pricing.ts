@@ -11,15 +11,17 @@ export function parsePriceBook(raw:unknown):PriceBook{
  }
  return b;
 }
-export function priceUsage(samples:UsageSample[],book:PriceBook):{usd:number|null;unpriced:string[]}{
- let usd=0;const unpriced=new Set<string>();
+export function priceUsage(samples:UsageSample[],book:PriceBook):{usd:number|null;unpriced:string[];pricedUSD:number;pricedCalls:number;unpricedCalls:number;unpricedTokens:number}{
+ let usd=0,pricedCalls=0,unpricedCalls=0,unpricedTokens=0;const unpriced=new Set<string>();
+ const missing=(s:UsageSample)=>{unpriced.add(s.model);unpricedCalls++;unpricedTokens+=[s.input,s.cached,s.cacheWrite,s.output].reduce((total,n)=>total+(finite(n)?n:0),0);};
  for(const s of samples){
-  if(![s.input,s.cached,s.cacheWrite,s.output,s.contextTokens].every(finite)){unpriced.add(s.model);continue;}
+  if(![s.input,s.cached,s.cacheWrite,s.output,s.contextTokens].every(finite)){missing(s);continue;}
   const p=Object.hasOwn(book.models,s.model)?book.models[s.model]:undefined;
-  if(!p||s.cacheWrite>0&&p.cacheWrite===undefined){unpriced.add(s.model);continue;}
+  if(!p||s.cacheWrite>0&&p.cacheWrite===undefined){missing(s);continue;}
   const l=p.longContext&&s.contextTokens>p.longContext.above?p.longContext:undefined;
-  if(l&&s.cacheWrite>0&&l.cacheWrite===undefined){unpriced.add(s.model);continue;}
+  if(l&&s.cacheWrite>0&&l.cacheWrite===undefined){missing(s);continue;}
   usd+=(s.input*p.input*(l?.input??1)+s.cached*p.cached*(l?.cached??1)+s.output*p.output*(l?.output??1)+s.cacheWrite*(p.cacheWrite??0)*(l?.cacheWrite??1))/1_000_000;
+  pricedCalls++;
  }
- return {usd:samples.length&&!unpriced.size&&Number.isFinite(usd)?usd:null,unpriced:[...unpriced]};
+ return {usd:samples.length&&!unpriced.size&&Number.isFinite(usd)?usd:null,unpriced:[...unpriced],pricedUSD:usd,pricedCalls,unpricedCalls,unpricedTokens};
 }

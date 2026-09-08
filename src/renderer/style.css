@@ -124,3 +124,23 @@ button.usage-day{border:0;border-radius:3px;background:none;padding:0;cursor:poi
 
 /* Preserve useful list space below the Windows title bar on short displays. */
 @media(max-height:650px){.live-dashboard #list-hint{display:none}.live-dashboard .workspace>aside{padding-top:12px}.live-dashboard #global-auto{margin-top:8px}.live-dashboard .intro{margin-bottom:10px}}
+
+/* Everyday companion: task activity and results are the first things to read. */
+#supply-card{width:320px;padding:16px;box-sizing:border-box}
+#supply-card .companion-task{position:relative;padding:10px 0;border-bottom:1px solid #65757e30}
+#supply-card .companion-task .supply-title{font-size:12px;margin:0 0 4px;padding-right:64px;-webkit-line-clamp:1}
+.companion-status{font-size:10px;color:#a6b2b7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:62px}
+.companion-status:before{content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:#84939a;margin-right:6px;vertical-align:1px}
+.companion-status[data-work=running]:before{background:#a8c2ac}.companion-status[data-work=waiting]:before{background:#e5b477}
+#supply-card .companion-task button{position:absolute;right:0;top:14px;margin:0;padding:4px 6px;font-size:10px;background:transparent}
+.companion-result{padding:12px;margin-top:12px;border:1px solid #a8c2ac40;border-radius:9px;background:#a8c2ac09}
+#supply-card .companion-result .supply-title{font-size:12px;margin:6px 0}.companion-excerpt{font-size:11px;line-height:1.6;color:#bac6c5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0}
+#supply-card .companion-result button{margin-top:9px;font-size:11px}
+#pet-result{position:fixed;z-index:19;background:#263730f2;border:1px solid #8dab9566;color:#d0e2d5;border-radius:12px;padding:3px 9px;font:10px/1.5 -apple-system,BlinkMacSystemFont,sans-serif;cursor:pointer;box-shadow:0 2px 8px #0002;max-width:160px}
+#pet-result:before{content:'▤';margin-right:5px;color:#a8c2ac}#pet-result:hover{background:#354c41}#pet-result[hidden]{display:none}
+.usage-pricing-reason{font-size:11px;line-height:1.6;color:#d9b47e;margin:10px 0;overflow-wrap:anywhere}.usage-freshness{font-size:10px;color:var(--muted);margin:0 0 12px}
+
+.usage-month .usage-value-note{font-size:13px;color:var(--muted);letter-spacing:0;font-weight:400;line-height:1.5}
+
+.app-updates{border-top:1px solid #ffffff16;margin-top:18px;padding-top:16px}.app-update-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}.app-update-heading h2{margin:0!important}.app-update-heading span{font:11px monospace;color:var(--muted)}#app-update-status{font-size:12px;line-height:1.6;margin:9px 0}.app-update-actions{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}.app-updates [hidden]{display:none}#settings-dialog{max-height:calc(100vh - 40px);overflow:auto}.app-updates .hint{font-size:10px}
+#app-update-banner{display:flex;align-items:center;gap:10px;flex-shrink:0;margin:0 0 12px;padding:7px 12px;border:1px solid #b895633b;border-radius:7px;background:#302a20;color:#d8bd94;font-size:11px;line-height:1.5}#app-update-banner[hidden]{display:none}#app-update-banner-text{flex:1;overflow-wrap:anywhere}#app-update-banner .quiet{font-size:11px;padding:4px 7px;flex-shrink:0;color:#dfc49e}

@@ -25,6 +25,7 @@ export type Location =
   | { kind: 'located'; threadId: string; windowId: number; pid: number; bounds: Rect; row?: Rect; evidence: 'route' | 'selected-link' }
   | { kind: 'unlocated'; reason: 'permission' | 'stale' | 'hidden' | 'ambiguous' | 'unavailable' };
 export interface OverseerState {
+  update?:import('./updates').UpdateState;
   settings?:Settings;language?:Language;retryProgress?:Record<string,RetryProgress>;
   character: CharacterId;
   mode: 'demo' | 'live'; tasks: Task[]; selectedId: string | null;

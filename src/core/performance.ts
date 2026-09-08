@@ -26,6 +26,8 @@ export function restingPerformance(live?:LiveState,progress?:RetryProgress,obser
 }
 export const clamp=(v:number)=>Math.max(0,Math.min(1,v));
 const ease=(v:number)=>{v=clamp(v);return v*v*(3-2*v);};
+// A short, soft work gesture between long calm intervals; the work state stays active.
+export function ambientGesture(time:number,offset=0):number{const phase=((time+offset)%22000+22000)%22000;return keys(phase,[[0,0],[15000,0],[16500,1],[18200,1],[20500,0],[22000,0]]);}
 // Nonuniform key times keep anticipation slow, the strike short, and settling long.
 export function keys(t:number,points:ReadonlyArray<readonly [number,number]>):number{
   for(let i=1;i<points.length;i++)if(t<=points[i][0]){const [a,x]=points[i-1],[b,y]=points[i];return x+(y-x)*ease((t-a)/(b-a));}
@@ -37,7 +39,7 @@ export function foremanPose(mode:Performance,age:number,time:number,gait=0):Pose
   const p:Pose={lean:0,bob:Math.sin(t*2)*.65,head:Math.sin(t*.8)*.025,leftX:-28,leftY:17,rightX:33,rightY:16,gaze:0,lid:0,power:0,impact:0};
   if(mode==='walk'){p.lean=.09;p.bob=-Math.abs(Math.sin(gait))*2;p.leftX=-30-Math.sin(gait)*5;p.rightX=32+Math.sin(gait)*5;p.head=-.04;}
   if(mode==='thinking'){p.head=-.11;p.rightX=10;p.rightY=-12;p.gaze=-2;p.leftX=-24;p.leftY=10;}
-  if(mode==='working'){p.head=.11;p.leftX=-12;p.leftY=4;p.rightX=14+Math.sin(t*5)*2;p.rightY=2+Math.sin(t*5)*3;p.gaze=3;}
+  if(mode==='working'){const gesture=ambientGesture(time);p.head=.07+gesture*.04;p.leftX=-12;p.leftY=4;p.rightX=14+Math.sin(t*2)*2*gesture;p.rightY=2+Math.sin(t*2)*3*gesture;p.gaze=3;}
   if(mode==='retrying'){const lift=keys(u,[[0,0],[.22,1],[.5,1],[.75,0],[1,0]]);p.rightY=16-lift*34;p.head=-.09;p.gaze=3;p.lid=.3;}
   if(mode==='alert'){p.head=keys(u,[[0,.12],[.1,-.13],[.6,-.13],[1,0]]);p.bob-=keys(u,[[0,0],[.1,2],[.3,0],[1,0]]);p.gaze=4;}
   if(mode==='tap'){
