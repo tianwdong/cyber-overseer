@@ -1056,7 +1056,9 @@ async function interfaceSmoke(){
   state.character=character;
   for(const edge of ['left','right'] as const){
    await pet.webContents.executeJavaScript(`window.overseer.petDrag('start',200,300)`);
-   await pet.webContents.executeJavaScript(`window.overseer.petDrag('end',${edge==='left'?0:pet.getBounds().width},300)`);
+   // Keep the synthetic drop inside this display: width is the adjacent display's
+   // first pixel on multi-monitor desktops, where a real drag should cross over.
+   await pet.webContents.executeJavaScript(`window.overseer.petDrag('end',${edge==='left'?1:pet.getBounds().width-1},300)`);
    await new Promise(r=>setTimeout(r,350));
    check(await pet.webContents.executeJavaScript(`document.getElementById('pet-hit').dataset.docked===${JSON.stringify(edge)}`),'edge did not dock');
    check(await pet.webContents.executeJavaScript('document.getElementById("pet-hit").dataset.frontPeek==="true"'),'front portrait unavailable');
