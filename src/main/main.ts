@@ -2,6 +2,7 @@ import {managedCli,launchManagedCli} from './managed-cli';
 import {CliLiveTaskStream} from './cli-live-stream';
 import {companionSummary,codexTaskUrl} from '../core/companion-summary';
 import {UpdateChecker} from './updates';
+import {UpdateDownloader} from './update-download';
 import {RELEASES_URL} from '../core/updates';
 import {scanUsage} from './usage-overview';
 import {aggregateUsage} from '../core/usage-overview';
@@ -49,7 +50,8 @@ const demoTasks: Task[] = [
 ];
 let state: OverseerState = { character:'foreman',mode: demo ? 'demo' : 'live', tasks: demo ? demoTasks : [], selectedId: demo ? ids[0] : null,
   location: {kind:'unlocated', reason:'hidden'}, phase:'idle', message: demo ? '演练场：三个任务，两个同名。先找到正确的那一个。' : '读取本机任务，选择任务后启动自动督工。', snapshotAgeMs:null,watchingIds:[],autoAll:!demo,settings:{...defaultSettings},language:'zh',retryProgress:{} };
-const updates=new UpdateChecker({currentVersion:app.getVersion(),platform:process.platform,arch:process.arch,cacheFile:join(smoke?app.getPath('userData'):paths.stateDir,'updates.json'),onChange:update=>{if(quitting)return;state.update=update;publish();void notifyUpdate();}});
+const updates=new UpdateChecker({currentVersion:app.getVersion(),platform:process.platform,arch:process.arch,cacheFile:join(smoke?app.getPath('userData'):paths.stateDir,'updates.json'),onChange:update=>{if(quitting)return;state.update={...update,download:downloads.state?.version===update.release?.version?downloads.state:undefined};publish();if(!demo&&automaticUpdatesEnabled()&&update.status==='available'&&update.release&&downloads.state?.version!==update.release.version)void downloads.download(update.release);void notifyUpdate();}});
+const downloads=new UpdateDownloader({directory:join(app.getPath('userData'),'updates'),platform:process.platform,arch:process.arch,onChange:download=>{if(quitting)return;state.update={...updates.state,download};publish();}});
 state.update=updates.state;
 let updateTimer:ReturnType<typeof setInterval>,updateStartup:ReturnType<typeof setTimeout>,updateNotifying=false;
 const automaticUpdatesEnabled=()=>state.settings?.checkForUpdates!==false;
@@ -58,7 +60,7 @@ async function notifyUpdate(){
  if(demo||quitting||updateNotifying||state.settings?.checkForUpdates===false||updates.state.status!=='available'||!updates.state.release||!Notification.isSupported()||panel?.isVisible()&&!panel.isMinimized())return;
  updateNotifying=true;
  try{const release=updates.state.release;if(!await updates.claimNotification()||!automaticUpdatesEnabled())return;
-  const n=new Notification({title:state.language==='en'?'Cyber Overseer update available':'赛博督工有新版本',body:state.language==='en'?`Version ${release.version} is ready. View release notes and download when convenient.`:`版本 ${release.version} 已发布，可查看更新说明并下载。`,silent:true});
+  const n=new Notification({title:state.language==='en'?'Cyber Overseer update available':'赛博督工有新版本',body:state.language==='en'?`Version ${release.version} is ready. The installer downloads automatically; open the app to see progress.`:`版本 ${release.version} 已发布，安装包将自动下载，可在应用内查看进度。`,silent:true});
   n.on('click',()=>{showSettings();panel.webContents.send('open-settings');});n.show();
  }catch{/* An update reminder must never interrupt task watching. */}finally{updateNotifying=false;}
 }
@@ -380,8 +382,8 @@ async function command(name: string, value?: string):Promise<OverseerState> {
   if(name==='launch-cli'){
     if(!demo){const result=await dialog.showOpenDialog(panel,{title:state.language==='en'?'Choose a CLI project':'选择 CLI 项目文件夹',properties:['openDirectory']});
       if(!result.canceled&&result.filePaths[0]){await launchManagedCli(result.filePaths[0],join(__dirname,'cli-launcher.py'));state.message=state.language==='en'?'Codex CLI is opening in a terminal. It follows your automatic watch setting.':'正在终端中打开 Codex CLI，将按当前自动看护设置运行。';publish();}}
-  }else if(name==='check-app-update'){if(demo)state.update={currentVersion:app.getVersion(),status:'current',checkedAt:Date.now()};else state.update=await updates.check(true);publish();
-  }else if(name==='open-app-update'){const latest=demo?state.update:updates.state;if(value&&latest?.release?.version!==value)throw Error('Update information changed');if(!demo)await shell.openExternal(latest?.release?.url??RELEASES_URL);
+  }else if(name==='check-app-update'){if(demo)state.update={currentVersion:app.getVersion(),status:'current',checkedAt:Date.now()};else{await updates.check(true);if(updates.state.release&&!downloads.readyPath(updates.state.release.version))void downloads.download(updates.state.release);}publish();
+  }else if(name==='open-app-update'){const latest=demo?state.update:updates.state;if(value&&latest?.release?.version!==value)throw Error('Update information changed');if(!demo&&latest?.release){const installer=downloads.readyPath(latest.release.version);if(installer){const error=await shell.openPath(installer);if(error)throw Error(error);}else void downloads.download(latest.release);}
   }else if(name==='open-codex'){if(managedCli.get(value??''))throw Error(state.language==='en'?'This task is running in its CLI terminal. Switch to that terminal.':'该任务运行在 CLI 中，请返回启动它的终端。');const url=codexTaskUrl({...state,inbox:inbox.entries},value??'');if(!demo)await shell.openExternal(url);
   }else if(name==='inbox-read-many'){const ids:unknown=JSON.parse(value??'null');if(!Array.isArray(ids)||ids.length>100||!ids.every(id=>typeof id==='string'))throw Error('Invalid inbox selection');await inbox.markReadMany(ids);state.inboxError=false;publish();movePet();
   }else if(name==='inbox-read'){await inbox.markRead(value??'');state.inboxError=false;publish();movePet();
@@ -519,7 +521,7 @@ app.whenReady().then(async()=>{
   await tick();publish();
   if(!demo){
     await command('read-tasks');
-    await updates.load();state.update=updates.state;publish();scheduleUpdates();
+    await updates.load();publish();scheduleUpdates();
     void refreshUsageOverview();usageTimer=setInterval(()=>void refreshUsageOverview(),15000);
     void refreshSupply();supplyTimer=setInterval(()=>void refreshSupply(),5000);
     for(const id of new Set(initialWatches)){try{await command('select',id);await command('auto');}catch(error){state.message=error instanceof Error?error.message:'Unable to start task watching';publish();}}
@@ -585,6 +587,14 @@ async function updateSmoke(){
   check(visible.open&&visible.inside&&visible.width&&visible.text.includes(version),'update settings overflow or version missing');
   if(language==='en')check(!/[\u4e00-\u9fff]/.test(visible.text),'update settings English incomplete');
   await writeFile(join(artifactDir,`app-update-${language}-${width}.png`),(await panel.webContents.capturePage()).toPNG());
+  for(const status of ['downloading','verifying','error','ready'] as const){
+   state.update={...state.update!,download:{version,status,received:50,total:100}};publish();await pause();
+   const downloadUI=await panel.webContents.executeJavaScript(`({disabled:document.getElementById('download-app-update').disabled,text:document.getElementById('app-update-status').textContent,button:document.getElementById('download-app-update').textContent})`);
+   check(downloadUI.disabled===(status==='downloading'||status==='verifying'),'download button enabled while transferring');
+   if(status==='downloading')check(downloadUI.text.includes('50%'),'download progress missing');
+   if(status==='ready')check(downloadUI.button===(language==='en'?'Open installer':'打开安装包'),'installer action missing');
+   await writeFile(join(artifactDir,`app-update-${language}-${status}.png`),(await panel.webContents.capturePage()).toPNG());
+  }
   const selected=state.selectedId;await panel.webContents.executeJavaScript('document.getElementById("download-app-update").click()');await pause();check(state.selectedId===selected,'update download changed the task');
   state.update={...state.update,status:'error',error:'network'};publish();await pause();
   check(await panel.webContents.executeJavaScript('!document.getElementById("download-app-update").hidden && !document.getElementById("app-update-status").textContent.includes("最新") && !document.getElementById("app-update-status").textContent.includes("latest")'),'failed check claims current or lost known release');

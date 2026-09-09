@@ -40,7 +40,7 @@ export class CliDaemon {
       m.error?p.reject(new DispatchRejected(`CLI RPC ${m.error.code}: ${String(m.error.message).slice(0,300)}`)):p.resolve(m.result);
      });
      await new Promise<void>((resolve,reject)=>{ws.once('open',resolve);ws.once('error',reject);ws.once('close',()=>reject(new Error('CLI proxy closed')));});
-     await this.request('initialize',{clientInfo:{name:'cyber-overseer',version:'0.1.10'},capabilities:{experimentalApi:true}});
+     await this.request('initialize',{clientInfo:{name:'cyber-overseer',version:'0.1.11'},capabilities:{experimentalApi:true}});
      ws.send(JSON.stringify({method:'initialized'}));this.nextConnect=0;return;
     }catch{this.close();}
    }

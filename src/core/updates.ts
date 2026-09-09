@@ -1,5 +1,7 @@
 export const RELEASES_URL='https://github.com/tianwdong/cyber-overseer/releases';
+export interface UpdateDownload {version:string;status:'downloading'|'verifying'|'ready'|'error';received:number;total?:number}
 export interface UpdateState {
+ download?:UpdateDownload;
  currentVersion:string;
  status:'idle'|'checking'|'available'|'current'|'unsupported'|'error';
  release?:{version:string;url:string;prerelease:boolean};

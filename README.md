@@ -31,11 +31,11 @@
 
 已有 DMG 时，双击打开，将 **Cyber Overseer.app** 拖入 **Applications**，再启动应用。保持 Codex Desktop 已运行并登录即可；App 内置运行依赖，无需另装 Node.js 或 Python。
 
-**[下载 macOS 预览版 DMG](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.10)** · Apple Silicon · 约 130 MiB。尚未公证；安装与自行构建见 [App 与 DMG 打包](docs/packaging.md)。
+**[下载 macOS 预览版 DMG](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.11)** · Apple Silicon · 约 130 MiB。尚未公证；安装与自行构建见 [App 与 DMG 打包](docs/packaging.md)。
 
 ### Windows App
 
-**[下载 Windows x64 预览版安装程序](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.10)**。运行 `.exe`，选择安装目录即可；内置 Python／SQLite，无需另装 Node.js 或 Python。支持中英文安装界面，可从 Windows 设置卸载。
+**[下载 Windows x64 预览版安装程序](https://github.com/tianwdong/cyber-overseer/releases/tag/v0.1.11)**。运行 `.exe`，选择安装目录即可；内置 Python／SQLite，无需另装 Node.js 或 Python。支持中英文安装界面，可从 Windows 设置卸载。
 
 安装包尚未代码签名，Windows 可能显示信誉提示。真实 Codex 故障恢复与多屏桌面行为仍待 Windows 真机验收，详见 [Windows 支持状态](docs/windows-support.md)。
 
@@ -52,7 +52,7 @@ npm start
 
 首次启动默认开启自动看护；单击角色进入设置，调整重试次数和语言。语言默认跟随 Codex。关闭面板后继续在托盘值班，从托盘退出才会结束程序。
 
-源码版已支持**应用更新提醒**：约每 6 小时检查一次，按当前系统与架构匹配安装包；设置里可手动检查或关闭自动检查。发现新版本后查看说明、自行下载安装，不打断正在运行的任务。[更新机制与隐私说明](docs/app-updates.md)
+0.1.11 已支持**应用内自动下载更新**：约每 6 小时检查一次，按当前系统与架构匹配安装包；设置里可手动检查或关闭自动检查。发现新版本后自动下载并校验安装包，完成后可点击“打开安装包”，不打断正在运行的任务。[更新机制与隐私说明](docs/app-updates.md)
 
 
 ## 你休息，Plan 继续
